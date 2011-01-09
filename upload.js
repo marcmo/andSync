@@ -1,5 +1,6 @@
 var path = require('path'),
-    fs = require('fs');
+    fs = require('fs'),
+	url = require("url");
 
 require.paths.unshift(path.dirname(__dirname)+'/lib');
 var util = require('formidable/util');
@@ -40,16 +41,8 @@ path.exists(TEST_TMP, function (exists) {
 
 function startServer(){
 	var server = http.createServer(function(req, res) {
-	  if (req.url == '/') {
-		res.writeHead(200, {'content-type': 'text/html'});
-		res.end(
-		  '<form action="/upload" enctype="multipart/form-data" method="post">'+
-		  '<input type="text" name="title"><br>'+
-		  '<input type="file" name="upload" multiple="multiple"><br>'+
-		  '<input type="submit" value="Upload">'+
-		  '</form>'
-		);
-	  } else if (req.url == '/upload') {
+	  if (req.url == '/upload') {
+		console.log("was an upload");
 		var form = new formidable.IncomingForm(),
 			files = [],
 			fields = [];
@@ -82,7 +75,36 @@ function startServer(){
 			console.log("received bytes:" + form.bytesReceived);
 		  });
 		form.parse(req);
+	  } else if (req.url.match("^\/script")) {
+		console.log("was a script");
+		var uri = url.parse(req.url).pathname;  
+		var filename = path.join(process.cwd(), uri);  
+		path.exists(filename, function(exists) {  
+			if(!exists) {  
+				console.log(filename + " did not exist");
+				res.writeHead(404, {"Content-Type": "text/plain"});  
+				res.write("404 Not Found\n");  
+				res.end();  
+				return;  
+			}  
+	  
+			fs.readFile(filename, "binary", function(err, file) {  
+				if(err) {  
+					console.log("error...did not exist");
+					res.writeHead(500, {"Content-Type": "text/plain"});  
+					res.write(err + "\n");  
+					res.end();  
+					return;  
+				}  
+	  
+				console.log("ok.." + filename +"....did exist");
+				res.writeHead(200);  
+				res.write(file, "binary");  
+				res.end();  
+			});  
+		});  
 	  } else {
+		console.log("was an s.th. else: " + req.url);
 		res.writeHead(404, {'content-type': 'text/plain'});
 		res.end('404');
 	  }
