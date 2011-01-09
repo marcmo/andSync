@@ -1,2 +1,17 @@
-# small project sync music files
+# Music Sync
+
+small utility to upload files to a node.js webserver
+
+## Install
+
+* just clone the repository...
+* cd into the andSync.git directory
+* execute 'node fileUpload.js'
+
+## usage
+
+goto http://MYSERVER:12345/script/example/index.html
+
+where MYSERVER is e.g. localhost
+
 

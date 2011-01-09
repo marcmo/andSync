@@ -1,30 +1,29 @@
 var path = require('path'),
     fs = require('fs'),
 	url = require("url");
-
-require.paths.unshift(path.dirname(__dirname)+'/lib');
-var util = require('formidable/util');
-
-global.puts = util.puts;
-global.p = function() {
-  util.error(util.inspect.apply(null, arguments));
-};
-global.TEST_PORT = 13532;
-global.TEST_TMP = path.join(__dirname, 'uploadDir');
-var http = require('http'),
+	futil = require('formidable/util');
+	http = require('http'),
     util = require('util'),
     formidable = require('formidable');
+require.paths.unshift(path.dirname(__dirname)+'/lib');
 
-path.exists(TEST_TMP, function (exists) {
-	puts(exists ? TEST_TMP + " is already there" : "creating... ");
+global.puts = futil.puts;
+global.p = function() {
+  futil.error(futil.inspect.apply(null, arguments));
+};
+global.PORT = 12345;
+global.UPLOADDIR = path.join(__dirname, 'uploadDir');
+
+path.exists(UPLOADDIR, function (exists) {
+	puts(exists ? UPLOADDIR + " is already there" : "creating... ");
 	if (exists)
 	{
 		startServer();
 	}
 	else
 	{
-		fs.mkdir(TEST_TMP,0777,function(e){
-			puts(TEST_TMP + " dir created"); 
+		fs.mkdir(UPLOADDIR,0777,function(e){
+			puts(UPLOADDIR + " dir created"); 
 			startServer();
 		});
 	}
@@ -38,7 +37,7 @@ function startServer(){
 			files = [],
 			fields = [];
 
-		form.uploadDir = TEST_TMP;
+		form.uploadDir = UPLOADDIR;
 		form.keepExtensions = true;
 
 		form
@@ -100,7 +99,7 @@ function startServer(){
 		res.end('404');
 	  }
 	});
-	server.listen(TEST_PORT);
+	server.listen(PORT);
 
-	util.puts('listening on http://localhost:'+TEST_PORT+'/');
+	util.puts('listening on http://localhost:'+PORT+'/');
 }
