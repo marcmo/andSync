@@ -2,23 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>jQuery File Upload Example</title>
+<title>upload music for sync</title>
+<link type="text/css" rel="stylesheet" href="black.css" /> 
 <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.6/themes/base/jquery-ui.css" id="theme">
 <link rel="stylesheet" href="../jquery.fileupload-ui.css">
-<style>
-body {
-  font-family: Verdana, Arial, sans-serif;
-  font-size: 13px;
-  margin: 0;
-  padding: 20px;
-}
-</style>
 </head>
 <body>
 <form class="upload" action="/upload" method="POST" enctype="multipart/form-data">
     <input type="file" name="file" multiple>
     <button>Upload</button>
-    <div>Upload files</div>
+    <div>drag music files here</div>
 </form> 
 <table class="upload_files"></table>
 <table class="download_files"></table>

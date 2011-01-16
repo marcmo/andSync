@@ -9,20 +9,20 @@
   -moz-border-radius: 10px;
   -webkit-border-radius: 10px;
   border-radius: 10px;
-  width: 200px;
-  height: 30px;
-  line-height: 30px;
-  background: palegreen;
-  border: 1px solid limegreen;
+  width: 400px;
+  height: 60px;
+  line-height: 60px;
+  background: snow;
+  border: 3px solid darkgrey;
 }
 
 .file_upload_small {
-  width: 200px;
-  height: 30px;
-  line-height: 30px;
+  width: 400px;
+  height: 60px;
+  line-height: 60px;
   font-size: auto;
-  background: palegreen;
-  border: 1px solid limegreen;
+  background: snow;
+  border: 3px solid darkgrey;
 }
 
 .file_upload_large {
@@ -30,12 +30,12 @@
   height: 150px;
   line-height: 150px;
   font-size: 20px;
-  background: palegreen;
-  border: 1px solid limegreen;
+  background: snow;
+  border: 3px solid darkgrey;
 }
 
 .file_upload_highlight {
-  background: lawngreen;
+  background: yellow;
 }
 
 .file_upload input {

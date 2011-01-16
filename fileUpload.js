@@ -125,10 +125,9 @@ function startServer(){
 
 var mp3_list_emitter = new events.EventEmitter();
 function get_mp3_list(mp3List) {
-	console.log("inside get_mp3Llist list 3...");
 	console.log("get_mp3_list() function..." + mp3List);
 	var mp3s = jquery.map(mp3List, function(v){
-		return {text:v};	
+		return {text:path.basename(v)};	
 	});
 	console.log("mp3s:" + mp3s + "---" + JSON.stringify(mp3s));
 
