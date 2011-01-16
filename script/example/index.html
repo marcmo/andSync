@@ -54,5 +54,33 @@ $(function () {
     });
 });
 </script> 
+<p>list of available mp3s:</p>
+
+<ul id="mp3s">
+  <li>test</li>
+</ul>
+
+<div class="demo-description">
+</div>
+
+		<script type="text/javascript">
+		var mp3_list = $("#mp3s");
+
+    function load_mp3s() {
+      $.getJSON("/stream", function(mp3s) {
+      	console.log(mp3s);
+        if (mp3s.length > 0){
+          mp3_list.children().remove();
+          $.each(mp3s, function() {
+            $("<li>").html(this.text).prependTo(mp3_list);
+          });
+        }
+        // alert("hi");
+        setTimeout(load_mp3s,25);
+      });
+    }
+
+    setTimeout(load_mp3s, 1000);
+    </script>
 </body> 
 </html>
