@@ -1,14 +1,17 @@
-var path = require('path'),
-    fs = require('fs'),
+var path = require('path');
+require.paths.unshift(path.join(__dirname,'lib'));
+var fs = require('fs'),
 	url = require("url"),
 	futil = require('formidable/util'),
 	http = require('http'),
     util = require('util'),
     formidable = require('formidable'),
     events = require("events"),
-    jquery = require("jquery");
+    jquery = require("jquery"),
+	syncUtil = require("syncUtil");
 
-require.paths.unshift(path.dirname(__dirname)+'/lib');
+
+
 
 global.puts = futil.puts;
 global.p = function() {
@@ -139,41 +142,9 @@ function update_mp3_list() {
 	console.log("updateing list...");
 	var dir = path.join(process.cwd(), "mp3Folder");  
 	console.log("updateing list 2...");
-	flatten(dir, function(dirList) {
+	syncUtil.flatten(dir, function(dirList) {
 		get_mp3_list(dirList);
 	});
-}
-
-function flatten(dir,listener) {
-	var pendingDirs = 0;
-	var res = [];
-	function reducePendings(ps){
-		if (0 === ps) { 
-			pendingDirs--;
-			if(0 === pendingDirs){
-				listener(res);
-			}
-		} }
-	function doFlatten(dir,n){
-		pendingDirs++;
-		fs.readdir(dir,function (err,files){
-			var paths = jquery.map(files,function(v){return path.join(dir,v);});
-			var pendingStats = paths.length;
-			reducePendings(pendingStats);
-			jquery.map(paths, function(v,i){
-				fs.stat(v,function(err,s){
-					pendingStats--;
-					if (s.isDirectory()) {
-						doFlatten(v,n+1);
-					} else {
-						res.push(v);
-					}
-					reducePendings(pendingStats);
-				});
-			});
-		});
-	}
-	doFlatten(dir,0);
 }
 
 
