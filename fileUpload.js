@@ -106,7 +106,7 @@ function startServer(){
 			}, 1000);  
 
 		} else if (req.url.match("^\/script")) {
-			console.log("was a script");
+			console.log("was a script,url:"+req.url);
 			var uri = url.parse(req.url).pathname;  
 			serve_static_file(uri,res);
 		} else {
@@ -126,7 +126,8 @@ function get_mp3_list(mp3List) {
 	var mp3s = jquery.map(mp3List, function(v){
 		return {
 			name:path.basename(v),
-			modified:fs.statSync(v).mtime
+			modified:fs.statSync(v).mtime,
+			size:fs.statSync(v).size
 		};	
 	});
 	console.log("mp3s:" + mp3s + "---" + JSON.stringify(mp3s));

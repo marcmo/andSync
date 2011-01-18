@@ -13,58 +13,45 @@
   html>body #sortable li { height: 1.5em; line-height: 1.2em; }
   .ui-state-highlight { height: 1.5em; line-height: 1.2em; }
   </style>
-</head>
-<body>
-<form class="upload" action="/upload" method="POST" enctype="multipart/form-data">
-    <input type="file" name="file" multiple>
-    <button>Upload</button>
-    <div>drag music files here</div>
-</form> 
-<table class="upload_files"></table>
-<table class="download_files"></table>
-<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
-<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.6/jquery-ui.min.js"></script>
-<script src="../jquery.fileupload.js"></script>
-<script src="../jquery.fileupload-ui.js"></script>
-<script>
-/*global $ */
-$(function () {
-    $('.upload').fileUploadUI({
-        uploadTable: $('.upload_files'),
-        downloadTable: $('.download_files'),
-        buildUploadRow: function (files, index) {
-            var file = files[index];
-            return $(
-                '<tr style="display:none">' +
-                '<td>' + file.name + '<\/td>' +
-                '<td class="file_upload_progress"><div><\/div><\/td>' +
-                '<td class="file_upload_cancel">' +
-                '<div class="ui-state-default ui-corner-all ui-state-hover" title="Cancel">' +
-                '<span class="ui-icon ui-icon-cancel">Cancel<\/span>' +
-                '<\/div>' +
-                '<\/td>' +
-                '<\/tr>'
-            );
-        },
-        buildDownloadRow: function (file) {
-            return $(
-                '<tr style="display:none"><td>' + file.name + '<\/td><\/tr>'
-            );
-        }
-    });
-});
-</script> 
-<p>list of available mp3s:</p>
-
-<ul id="sortable"></ul>
-
-<div class="demo-description">
-</div>
-
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.6/jquery-ui.min.js"></script>
+  <script src="../jquery.fileupload.js"></script>
+  <script src="../jquery.fileupload-ui.js"></script>
+  <script>
+  /*global $ */
+  $(function () {
+      $('.upload').fileUploadUI({
+          uploadTable: $('.upload_files'),
+          downloadTable: $('.download_files'),
+          buildUploadRow: function (files, index) {
+              var file = files[index];
+              return $(
+                  '<tr style="display:none">' +
+                  '<td>' + file.name + '<\/td>' +
+                  '<td class="file_upload_progress"><div><\/div><\/td>' +
+                  '<td class="file_upload_cancel">' +
+                  '<div class="ui-state-default ui-corner-all ui-state-hover" title="Cancel">' +
+                  '<span class="ui-icon ui-icon-cancel">Cancel<\/span>' +
+                  '<\/div>' +
+                  '<\/td>' +
+                  '<\/tr>'
+              );
+          },
+          buildDownloadRow: function (file) {
+              return $(
+                  '<tr style="display:none"><td>' + file.name + '<\/td><\/tr>'
+              );
+          }
+      });
+      $( "#sortable" ).sortable({
+        placeholder: "ui-state-highlight"
+      });
+      $( "#sortable" ).disableSelection();
+  });
+  </script> 
   <script type="text/javascript">
   var mp3_list = $("#sortable");
 
-  var newMp3sToPutOnList = [];
   var listedMp3s = {};
 
   function load_mp3s() {
@@ -80,34 +67,33 @@ $(function () {
           if (!listedMp3s[this.name])
           {
             listedMp3s[this.name] = true;
-            var newItem = '<li id=' + this.name + ' class="ui-state-default">' + this.name + '<\/li>';
+            var newItem = '<li id=' + this.name + ' class="ui-state-default">' + this.name + '(' + this.size + ')<\/li>';
             $("#sortable").append(newItem);
             $("#sortable").sortable('refresh');
           }
         });
       }
-      // alert("hi");
-      setTimeout(load_mp3s,25);
+      setTimeout(load_mp3s,2500);
     });
   }
-
   setTimeout(load_mp3s, 1000);
   </script>
+</head>
+<body>
+<form class="upload" action="/upload" method="POST" enctype="multipart/form-data">
+    <input type="file" name="file" multiple>
+    <button>Upload</button>
+    <div>drag music files here</div>
+</form> 
+<table class="upload_files"></table>
+<table class="download_files"></table>
+<p>list of available mp3s:</p>
 
-  <script>
-  $(function() {
-    $( "#accordion" ).accordion();
-  });
-  </script>
+<ul id="sortable"></ul>
 
-  <script>
-  $(function() {
-    $( "#sortable" ).sortable({
-      placeholder: "ui-state-highlight"
-    });
-    $( "#sortable" ).disableSelection();
-  });
-  </script>
+<div class="demo-description">
+</div>
+
 
 
 </body> 
