@@ -89,22 +89,9 @@ function startServer(){
 			});
 			form.parse(req);
 		} else if(req.url === "/stream") {  
-			var listenerFunction = function(mp3s) {  
-				res.writeHead(200, { "Content-Type" : "text/plain" });  
-				res.write(JSON.stringify(mp3s));  
-				res.end();  
-				clearTimeout(timeout);  
-			};
-			mp3_list_emitter.addListener("mp3s", listenerFunction);
-
-			var timeout = setTimeout(function() {  
-				res.writeHead(200, { "Content-Type" : "text/plain" });  
-				res.write(JSON.stringify([]));  
-				res.end();  
-
-				mp3_list_emitter.removeListener("mp3s",listenerFunction);  
-			}, 1000);  
-
+			res.writeHead(200, { "Content-Type" : "text/plain" });  
+			res.write(JSON.stringify(myMp3List));  
+			res.end();  
 		} else if (req.url.match("^\/script")) {
 			console.log("was a script,url:"+req.url);
 			var uri = url.parse(req.url).pathname;  
@@ -120,19 +107,16 @@ function startServer(){
 	util.puts('listening on http://localhost:'+PORT+'/');
 }
 
-var mp3_list_emitter = new events.EventEmitter();
+var myMp3List = [];
 function get_mp3_list(mp3List) {
 	console.log("get_mp3_list() function..." + mp3List);
-	var mp3s = jquery.map(mp3List, function(v){
+	myMp3List = jquery.map(mp3List, function(v){
 		return {
 			name:path.basename(v),
 			modified:fs.statSync(v).mtime,
 			size:fs.statSync(v).size
 		};	
 	});
-	console.log("mp3s:" + mp3s + "---" + JSON.stringify(mp3s));
-
-	mp3_list_emitter.emit("mp3s", mp3s);
 }
 
 function update_mp3_list() {
