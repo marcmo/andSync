@@ -1,11 +1,18 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>upload music for sync</title>
-<link type="text/css" rel="stylesheet" href="black.css" /> 
-<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.6/themes/base/jquery-ui.css" id="theme">
-<link rel="stylesheet" href="../jquery.fileupload-ui.css">
+  <meta charset="utf-8">
+  <title>upload music for sync</title>
+  <link type="text/css" rel="stylesheet" href="black.css" /> 
+  <link type="text/css" href="css/smoothness/jquery-ui-1.8.8.custom.css" rel="stylesheet" />  
+  <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.6/themes/base/jquery-ui.css" id="theme">
+  <link rel="stylesheet" href="../jquery.fileupload-ui.css">
+  <style>
+  #sortable { list-style-type: none; margin: 0; padding: 0; width: 60%; }
+  #sortable li { margin: 0 5px 5px 5px; padding: 5px; font-size: 1.2em; height: 1.5em; }
+  html>body #sortable li { height: 1.5em; line-height: 1.2em; }
+  .ui-state-highlight { height: 1.5em; line-height: 1.2em; }
+  </style>
 </head>
 <body>
 <form class="upload" action="/upload" method="POST" enctype="multipart/form-data">
@@ -49,31 +56,59 @@ $(function () {
 </script> 
 <p>list of available mp3s:</p>
 
-<ul id="mp3s">
-  <li>test</li>
-</ul>
+<ul id="sortable"></ul>
 
 <div class="demo-description">
 </div>
 
-		<script type="text/javascript">
-		var mp3_list = $("#mp3s");
+  <script type="text/javascript">
+  var mp3_list = $("#sortable");
 
-    function load_mp3s() {
-      $.getJSON("/stream", function(mp3s) {
-      	console.log(mp3s);
-        if (mp3s.length > 0){
-          mp3_list.children().remove();
-          $.each(mp3s, function() {
-            $("<li>").html(this.text).prependTo(mp3_list);
-          });
-        }
-        // alert("hi");
-        setTimeout(load_mp3s,25);
-      });
+  var newMp3sToPutOnList = [];
+  var listedMp3s = {};
+
+  function load_mp3s() {
+    function compareMp3s(a,b){
+        return (a.name > b.name) ? 1 : -1;
     }
+    $.getJSON("/stream", function(mp3s) {
 
-    setTimeout(load_mp3s, 1000);
-    </script>
+      console.log(mp3s);
+
+      if (mp3s.length > 0){
+        $.each(mp3s.sort(compareMp3s), function() {
+          if (!listedMp3s[this.name])
+          {
+            listedMp3s[this.name] = true;
+            var newItem = '<li id=' + this.name + ' class="ui-state-default">' + this.name + '<\/li>';
+            $("#sortable").append(newItem);
+            $("#sortable").sortable('refresh');
+          }
+        });
+      }
+      // alert("hi");
+      setTimeout(load_mp3s,25);
+    });
+  }
+
+  setTimeout(load_mp3s, 1000);
+  </script>
+
+  <script>
+  $(function() {
+    $( "#accordion" ).accordion();
+  });
+  </script>
+
+  <script>
+  $(function() {
+    $( "#sortable" ).sortable({
+      placeholder: "ui-state-highlight"
+    });
+    $( "#sortable" ).disableSelection();
+  });
+  </script>
+
+
 </body> 
 </html>
