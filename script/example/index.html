@@ -57,7 +57,7 @@
     function compareMp3s(a,b){
         return (a.name > b.name) ? 1 : -1;
     }
-    $.getJSON("/stream", function(mp3s) {
+    $.getJSON("/content", function(mp3s) {
 
       console.log(mp3s);
 
