@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <title>upload music for sync</title>
-  <link type="text/css" rel="stylesheet" href="black.css" /> 
+  <link type="text/css" rel="stylesheet" href="css/black.css" /> 
   <link type="text/css" href="css/smoothness/jquery-ui-1.8.8.custom.css" rel="stylesheet" />  
   <link rel="stylesheet" href="css/jquery.fileupload-ui.css">
   <style>
-  #sortable { list-style-type: none; margin: 0; padding: 0; width: 60%; }
-  #sortable li { margin: 0 5px 5px 5px; padding: 5px; font-size: 1.2em; height: 1.5em; }
-  html>body #sortable li { height: 1.5em; line-height: 1.2em; }
-  .ui-state-highlight { height: 1.5em; line-height: 1.2em; }
+    #sortable { list-style-type: none; margin: 0; padding: 0; width: 60%; }
+    #sortable li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1em; height: 18px; }
+    #sortable li span { position: absolute; margin-left: -1.3em; }
+    .ui-state-highlight { height: 1.5em; line-height: 1.2em; }
   </style>
   <script src="js/jquery-1.4.4.min.js"></script>
   <script src="js/jquery-ui-1.8.8.custom.min.js"></script>
@@ -66,7 +66,10 @@
           if (!listedMp3s[this.name])
           {
             listedMp3s[this.name] = true;
-            var newItem = '<li id=' + this.name + ' class="ui-state-default">' + this.name + '(' + this.size + ')<\/li>';
+            var newItem = '<li id=' + this.name + 
+                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"></span><a href="/content/' +
+                  this.name  + '">' + this.name + '</a></li>';
+            // <li class="ui-state-default"><span class="ui-icon ui-icon-volume-on"></span><a href="http://www.spiegel.de">Item 1</a></li>
             $("#sortable").append(newItem);
             $("#sortable").sortable('refresh');
           }
@@ -88,12 +91,8 @@
 <table class="download_files"></table>
 <p>list of available mp3s:</p>
 
-<ul id="sortable"></ul>
-
-<div class="demo-description">
-</div>
-
-
+<ul id="sortable">
+</ul>
 
 </body> 
 </html>
