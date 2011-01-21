@@ -52,7 +52,8 @@ function serve_static_file(uri, res) {
 
 function startServer(){
   var server = http.createServer(function(req, res) {
-    var contentRegex = /\/content\/([\w\d\.\-_]*)/i;
+	console.log("server: req:" + req.url);
+    var contentRegex = /\/content\/(.*\.\w*)/i;
     if (req.url == '/upload') {
       console.log("was an upload");
       var form = new formidable.IncomingForm(),
@@ -97,10 +98,10 @@ function startServer(){
       res.write(JSON.stringify(myMp3List));  
       res.end();  
     } else if (contentRegex.test(req.url)) {
-      console.log("req.url was:" + req.url);
+	  console.log("content url was:" + req.url);
       var matchedMp3 = contentRegex.exec(req.url)[1];
-      console.log("matched:" + matchedMp3);
-      serve_static_file(path.join("mp3Folder",matchedMp3),res);
+      var unescaped = unescape(matchedMp3);
+      serve_static_file(path.join("mp3Folder",unescaped),res);
     } else if (req.url.match("^\/script")) {
       console.log("was a script,url:"+req.url);
       var uri = url.parse(req.url).pathname;  
