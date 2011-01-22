@@ -15,7 +15,7 @@ global.puts = futil.puts;
 global.p = function() {
   futil.error(futil.inspect.apply(null, arguments));
 };
-global.PORT = 12345;
+global.PORT = 8080;
 global.UPLOADDIR = path.join(__dirname, 'uploadDir');
 global.MP3DIR = path.join(__dirname, 'mp3Folder');
 
