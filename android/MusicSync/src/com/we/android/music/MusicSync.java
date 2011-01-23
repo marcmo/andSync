@@ -36,6 +36,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 public class MusicSync extends Activity {
+    private static final String TAG = "MusicSync";
     private static final String HOST = "http://www.coldflake.com:8080";
     public File mlocalSyncFolder;
 
@@ -56,7 +57,7 @@ public class MusicSync extends Activity {
 	super.onCreate(savedInstanceState);
 	setContentView(R.layout.main);
 
-	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), "musicsync");
+	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), TAG);
 	if (!mlocalSyncFolder.exists()) {
 	    mlocalSyncFolder.mkdir();
 	}
@@ -71,7 +72,7 @@ public class MusicSync extends Activity {
     }
 
     private List<String> getFilesRelativeToFolder(File folder, List<File> files) {
-	// remove leading /
+	// remove leading "/"
 	int posPrefix = folder.getAbsolutePath().length() + 1;
 	List<String> relativeToSync = new ArrayList<String>();
 	for (File file : files) {
@@ -95,7 +96,7 @@ public class MusicSync extends Activity {
 		if (!set.contains(file)) {
 		    missingFiles.add(new DownloadTask(file, size, 0));
 		}
-		Log.d("MusicSync", "remote file: " + file + " size: " + size);
+		Log.d(TAG, "remote file: " + file + " size: " + size);
 	    } 
 	} catch (JSONException e) {
 	    e.printStackTrace();
@@ -130,48 +131,60 @@ public class MusicSync extends Activity {
 
 	@Override
 	protected Void doInBackground(DownloadTask... tasks) {
+	    HttpClient httpclient = new DefaultHttpClient();
 	    for (final DownloadTask task : tasks) {
-		HttpClient httpclient = new DefaultHttpClient();
 		String encoded = HOST + "/content/" + Uri.encode(task.mFile);
 		HttpGet httpget = new HttpGet(encoded);
 		try {
 		    HttpResponse response = httpclient.execute(httpget);
-		    Log.i("MusicSync", response.getStatusLine().toString());
-
 		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
 			HttpEntity entity = response.getEntity();
 			if (entity != null) {
-			    runOnUiThread(new Runnable() {
-				@Override
-				public void run() {
-				    mInfo.setText("Download: " + task.mFile);
-				    mProgress.setMax(100);
-				}
-			    });	
-			    FileOutputStream output = new FileOutputStream(new File(mlocalSyncFolder, task.mFile));
-			    BufferedInputStream input = new BufferedInputStream(entity.getContent());
-			    download(input, output, task.mSize);
-			    if (isCancelled()) break;
+			    updateUi(task);
+			    try {
+				FileOutputStream output = new FileOutputStream(new File(mlocalSyncFolder, task.mFile));
+				BufferedInputStream input = new BufferedInputStream(entity.getContent());
+				try {
+				    download(input, output, task.mSize);
+				} finally {
+				    output.close();
+				    input.close();
+				} 
+			    } catch (Exception e) {
+				Log.e(TAG, e.toString());
+			    }
 			}
+			if (isCancelled()) break;
 		    } else {
-			Log.i("MusicSync","download failed: " + response.getStatusLine().toString());
+			Log.i(TAG,"download failed: " + response.getStatusLine().toString());
 		    }
 		} catch(Exception e) {
+		    Log.i(TAG,"HttpRequest not successful" + e.toString());
 		}
 	    }
 	    return null;
 	}
 
-	private void download(InputStream is, OutputStream os, int totalSize) throws Exception {
+	private void updateUi(final DownloadTask task) {
+	    runOnUiThread(new Runnable() {
+		@Override
+		public void run() {
+		    mInfo.setText("Download: " + task.mFile);
+		    mProgress.setMax(100);
+		}
+	    });
+	}
+
+	private void download(InputStream is, OutputStream os, int totalSize) throws IOException {
 	    byte[] buffer = new byte[5000];
 	    int counter = 0;
-	    int read = is.read(buffer);
-	    while (!isCancelled() && (read != -1)) {
-		counter += read;
+	    int bytesRead = is.read(buffer);
+	    while (!isCancelled() && (bytesRead != -1)) {
+		counter += bytesRead;
 		int percentPerFile = (int) ((counter / (float) totalSize) * 100);
 		publishProgress(percentPerFile);
-		os.write(buffer, 0, read);
-		read = is.read(buffer);
+		os.write(buffer, 0, bytesRead);
+		bytesRead = is.read(buffer);
 	    }
 	    is.close();
 	    os.close();
@@ -226,14 +239,14 @@ public class MusicSync extends Activity {
 	JSONArray files = null;
 	try {
 	    HttpResponse response = httpclient.execute(httpget);
-	    Log.i("MusicSync",response.getStatusLine().toString());
+	    Log.i(TAG,response.getStatusLine().toString());
 
 	    HttpEntity entity = response.getEntity();
 	    if (entity != null) {
 		InputStream input = entity.getContent();
 		String result = convertStreamToString(input);
 		input.close();
-		Log.i("MusicSync",result);
+		Log.i(TAG,result);
 		files = new JSONArray(result);
 	    }
 	} catch (Exception e) {
