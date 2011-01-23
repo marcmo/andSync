@@ -53,6 +53,12 @@
 
   var listedMp3s = {};
 
+  function clearMp3s() {
+    $.getJSON("/clear", function(mp3s) {
+        console.log(mp3s);
+      });
+  }
+
   function load_mp3s() {
     function compareMp3s(a,b){
         return (a.name > b.name) ? 1 : -1;
@@ -93,6 +99,9 @@
 
 <ul id="sortable">
 </ul>
+
+<div id="manageDiv"><h2>Manage mp3 list</h2></div>
+<button type="button" onclick="clearMp3s()">clear all items</button>
 
 </body> 
 </html>

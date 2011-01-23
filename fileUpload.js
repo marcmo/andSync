@@ -51,8 +51,9 @@ function serve_static_file(uri, res) {
 }
 
 function startServer(){
+  updateMp3List();
   var server = http.createServer(function(req, res) {
-	console.log("server: req:" + req.url);
+    console.log("server: req:" + req.url);
     var contentRegex = /\/content\/(.*\.\w*)/i;
     if (req.url == '/upload') {
       console.log("was an upload");
@@ -76,8 +77,6 @@ function startServer(){
         currentFile = file;
         console.log("currentFile: " + currentFile);
         console.log("on...pushed: field:" + field + ",file:" + file);
-        console.log("on...expected bytes:" + form.bytesExpected);
-        console.log("on...received bytes:" + form.bytesReceived);
         var x = crypto.createHash('sha1').update(file).digest('hex');
         console.log("hash:" + x);
       }).on('end', function() {
@@ -86,22 +85,39 @@ function startServer(){
         res.write('received fields:\n\n '+util.inspect(fields));
         res.write('\n\n');
         res.end('received files:\n\n '+util.inspect(files));
-        console.log("end...expected bytes:" + form.bytesExpected);
-        console.log("end...received bytes:" + form.bytesReceived);
+        console.log("end...expected " + form.bytesExpected + " bytes, received " + form.bytesReceived + " bytes.");
         console.log("currentFile: " + currentFile.filename);
-        console.log("currentFile: " + currentFile.path);
-        fs.rename(currentFile.path,path.join(MP3DIR,currentFile.filename));
+        fs.rename(currentFile.path,
+          path.join(MP3DIR,currentFile.filename),
+          updateMp3List);
       });
       form.parse(req);
     } else if(req.url === "/content") {  
       res.writeHead(200, { "Content-Type" : "text/plain" });  
       res.write(JSON.stringify(myMp3List));  
       res.end();  
+    } else if(req.url === "/clear") {  
+      res.writeHead(200, { "Content-Type" : "text/plain" });  
+      fs.readdir(MP3DIR, function(err,files){
+          var deleteCount = files.length;
+          jquery.map(files, function(file){
+            if (err) {throw err;}
+            fs.unlink(path.join(MP3DIR,file), function (err) {
+                if (err) {throw err;}
+                console.log('successfully deleted ' + file + ', ' + deleteCount + ' to go...');
+                deleteCount--;
+                if(deleteCount === 0){
+                  updateMp3List();
+                  res.write(JSON.stringify(myMp3List));  
+                  res.end();
+                }
+            });
+          });
+      });
     } else if (contentRegex.test(req.url)) {
-	  console.log("content url was:" + req.url);
+      console.log("content url was:" + req.url);
       var matchedMp3 = contentRegex.exec(req.url)[1];
-      var unescaped = unescape(matchedMp3);
-      serve_static_file(path.join("mp3Folder",unescaped),res);
+      serve_static_file(path.join("mp3Folder",unescape(matchedMp3)),res);
     } else if (req.url.match("^\/script")) {
       console.log("was a script,url:"+req.url);
       var uri = url.parse(req.url).pathname;  
@@ -129,13 +145,12 @@ function get_mp3_list(mp3List) {
   });
 }
 
-function update_mp3_list() {
+function updateMp3List() {
   console.log(util.inspect(process.memoryUsage()));
   syncUtil.flatten(MP3DIR, function(dirList) {
     get_mp3_list(dirList);
   });
 }
 
-setInterval(update_mp3_list, 5000);
 
 
