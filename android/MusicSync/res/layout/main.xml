@@ -2,11 +2,28 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    >
-<TextView  
-    android:layout_width="fill_parent" 
-    android:layout_height="wrap_content" 
-    android:text="@string/hello"
-    />
+    android:layout_height="fill_parent">
+	<TextView  android:id="@+id/info"
+	    android:layout_width="fill_parent" 
+	    android:layout_height="wrap_content"/>
+	<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    	android:orientation="horizontal"
+    	android:layout_width="fill_parent"
+    	android:layout_height="wrap_content">
+		<ProgressBar android:id="@+id/progressbar"
+		    style="?android:attr/progressBarStyleHorizontal"
+		    android:layout_width="200dip" 
+		    android:layout_height="wrap_content"/>
+		<TextView  android:id="@+id/percentage"
+	    	android:layout_width="wrap_content" 
+	    	android:layout_height="wrap_content"/>
+	</LinearLayout>    
+	<Button android:id="@+id/cancelbutton"
+		android:visibility="gone"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="Cancel"/>
+	<TextView  android:id="@+id/result"
+	    android:layout_width="wrap_content" 
+	    android:layout_height="wrap_content"/>
 </LinearLayout>

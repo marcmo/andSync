@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -24,40 +25,54 @@ import org.json.JSONObject;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 public class MusicSync extends Activity {
     private static final String HOST = "http://www.coldflake.com:8080";
+    public File mlocalSyncFolder;
+
+    private class DownloadTask {
+	String mFile;
+	int mSize;
+	int mDownloadedSize;
+
+	public DownloadTask(String uri, int totalSize, int downloadedSize) {
+	    mFile = uri;
+	    mSize = totalSize;
+	    mDownloadedSize = downloadedSize;
+	}
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
 	super.onCreate(savedInstanceState);
 	setContentView(R.layout.main);
 
-	File syncDir = new File(Environment.getExternalStorageDirectory(), "musicsync");
-	if (!syncDir.exists()) {
-	    syncDir.mkdir();
+	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), "musicsync");
+	if (!mlocalSyncFolder.exists()) {
+	    mlocalSyncFolder.mkdir();
 	}
 
-	List<String> allFilesRelativeToSync = getFilesRelativeToFolder(syncDir, flattenDir(syncDir));
+	List<String> allFilesRelativeToSync = getFilesRelativeToFolder(mlocalSyncFolder, flattenDir(mlocalSyncFolder));
 
 	JSONArray syncFolder = getSyncFolder(HOST + "/content");
-	List<String> missingFiles = findMissingFiles(allFilesRelativeToSync, syncFolder);
+	List<DownloadTask> downloadTasks = findMissingFiles(allFilesRelativeToSync, syncFolder);
 
-	for (String missing : missingFiles) {
-	    Log.d("MusicSync", "missing: " + missing + " downloading...");
-	    try {
-		downloadFile(missing);
-	    } catch (Exception e) {
-		e.printStackTrace();
-	    }
-	}
+	DownloadTask[] tasks = downloadTasks.toArray(new DownloadTask[downloadTasks.size()]);
+	new Downloader().execute(tasks);
     }
 
     private List<String> getFilesRelativeToFolder(File folder, List<File> files) {
-	int posPrefix = folder.getAbsolutePath().length();
+	// remove leading /
+	int posPrefix = folder.getAbsolutePath().length() + 1;
 	List<String> relativeToSync = new ArrayList<String>();
 	for (File file : files) {
 	    String relativeFileName = file.getAbsolutePath().substring(posPrefix);
@@ -66,21 +81,21 @@ public class MusicSync extends Activity {
 	return relativeToSync;
     }
 
-    private List<String> findMissingFiles(List<String> localFiles, JSONArray syncFolder) {
+    private List<DownloadTask> findMissingFiles(List<String> localFiles, JSONArray syncFolder) {
 	Set<String> set = new HashSet<String>();
 	for (String file : localFiles) {
 	    set.add(file);
 	}
-	List<String> missingFiles = new ArrayList<String>();
+	List<DownloadTask> missingFiles = new ArrayList<DownloadTask>();
 	try {
 	    for(int i=0; i<syncFolder.length();i++) {
 		JSONObject fileInfo = syncFolder.getJSONObject(i);
 		String file = fileInfo.getString("name");
+		int size = fileInfo.getInt("size");
 		if (!set.contains(file)) {
-		    missingFiles.add(file);
+		    missingFiles.add(new DownloadTask(file, size, 0));
 		}
-
-		Log.d("MusicSync", "file: " + fileInfo.getString("name") + " size: " + fileInfo.getInt("size"));
+		Log.d("MusicSync", "remote file: " + file + " size: " + size);
 	    } 
 	} catch (JSONException e) {
 	    e.printStackTrace();
@@ -88,32 +103,99 @@ public class MusicSync extends Activity {
 	return missingFiles;
     }
 
-    private List<String> findIncompleteFiles(List<String> localFiles, JSONArray syncFolder) {
-	return new ArrayList<String>();
-    }
+    class Downloader extends AsyncTask<DownloadTask, Integer, Void> {
+	private ProgressBar mProgress;
+	private TextView mInfo;
+	private TextView mPercentage;
+	private Button mButton;
+	private TextView mResult;
 
-    private void downloadFile(String file) throws Exception {
-	HttpClient httpclient = new DefaultHttpClient();
-	String encoded = HOST + "/content/" + Uri.encode(file);
-	HttpGet httpget = new HttpGet(encoded);
-	HttpResponse response = httpclient.execute(httpget);
-
-	if (response.getStatusLine().equals(HttpStatus.SC_OK)) {
-	    HttpEntity entity = response.getEntity();
-	    if (entity != null) {
-		FileOutputStream fos = new FileOutputStream(file);
-		BufferedInputStream input = new BufferedInputStream(entity.getContent());
-		byte[] buffer = new byte[1000];
-		int read = input.read(buffer);
-		while (read != -1) {
-		    fos.write(buffer, 0, read);
-		    read = input.read(buffer);
+	@Override
+	protected void onPreExecute() {
+	    mProgress = (ProgressBar) findViewById(R.id.progressbar);
+	    mInfo = (TextView) findViewById(R.id.info);
+	    mPercentage = (TextView) findViewById(R.id.percentage);
+	    mResult = (TextView) findViewById(R.id.result);
+	    mButton = (Button) findViewById(R.id.cancelbutton);
+	    mButton.setVisibility(View.VISIBLE);
+	    mButton.setOnClickListener(new OnClickListener() {
+		@Override
+		public void onClick(View v) {
+		    cancel(false);
+		    mButton.setVisibility(View.GONE);
 		}
-		input.close();
-		fos.close();
+	    });
+	    super.onPreExecute();
+	}
+
+	@Override
+	protected Void doInBackground(DownloadTask... tasks) {
+	    for (final DownloadTask task : tasks) {
+		HttpClient httpclient = new DefaultHttpClient();
+		String encoded = HOST + "/content/" + Uri.encode(task.mFile);
+		HttpGet httpget = new HttpGet(encoded);
+		try {
+		    HttpResponse response = httpclient.execute(httpget);
+		    Log.i("MusicSync", response.getStatusLine().toString());
+
+		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+			HttpEntity entity = response.getEntity();
+			if (entity != null) {
+			    runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+				    mInfo.setText("Download: " + task.mFile);
+				    mProgress.setMax(100);
+				}
+			    });	
+			    FileOutputStream output = new FileOutputStream(new File(mlocalSyncFolder, task.mFile));
+			    BufferedInputStream input = new BufferedInputStream(entity.getContent());
+			    download(input, output, task.mSize);
+			    if (isCancelled()) break;
+			}
+		    } else {
+			Log.i("MusicSync","download failed: " + response.getStatusLine().toString());
+		    }
+		} catch(Exception e) {
+		}
 	    }
-	} else {
-	    Log.i("MusicSync","download failed: " + response.getStatusLine().toString());
+	    return null;
+	}
+
+	private void download(InputStream is, OutputStream os, int totalSize) throws Exception {
+	    byte[] buffer = new byte[5000];
+	    int counter = 0;
+	    int read = is.read(buffer);
+	    while (!isCancelled() && (read != -1)) {
+		counter += read;
+		int percentPerFile = (int) ((counter / (float) totalSize) * 100);
+		publishProgress(percentPerFile);
+		os.write(buffer, 0, read);
+		read = is.read(buffer);
+	    }
+	    is.close();
+	    os.close();
+	}
+
+	@Override
+	protected void onProgressUpdate(Integer... values) {
+	    mProgress.setProgress(values[0]);
+	    mPercentage.setText(values[0] + "%");
+	    super.onProgressUpdate(values);
+	}
+
+	@Override
+	protected void onCancelled() {
+	    mButton.setVisibility(View.GONE);
+	    mResult.setText("canceld...");
+	    super.onCancelled();
+	}
+
+	@Override
+	protected void onPostExecute(Void result) {
+	    mButton.setVisibility(View.GONE);
+	    mResult.setText("all files synced.");
+	    super.onPostExecute(result);
 	}
     }
 
