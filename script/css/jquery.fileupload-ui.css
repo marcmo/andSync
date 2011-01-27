@@ -9,20 +9,20 @@
   -moz-border-radius: 10px;
   -webkit-border-radius: 10px;
   border-radius: 10px;
-  width: 400px;
-  height: 60px;
-  line-height: 60px;
-  background: snow;
-  border: 3px solid darkgrey;
+  width: 200px;
+  height: 30px;
+  line-height: 30px;
+  background: palegreen;
+  border: 1px solid limegreen;
 }
 
 .file_upload_small {
-  width: 400px;
-  height: 60px;
-  line-height: 60px;
+  width: 200px;
+  height: 30px;
+  line-height: 30px;
   font-size: auto;
-  background: snow;
-  border: 3px solid darkgrey;
+  background: palegreen;
+  border: 1px solid limegreen;
 }
 
 .file_upload_large {
@@ -30,12 +30,12 @@
   height: 150px;
   line-height: 150px;
   font-size: 20px;
-  background: snow;
-  border: 3px solid darkgrey;
+  background: palegreen;
+  border: 1px solid limegreen;
 }
 
 .file_upload_highlight {
-  background: yellow;
+  background: lawngreen;
 }
 
 .file_upload input {
@@ -48,6 +48,7 @@
   -ms-filter: 'alpha(opacity=0)';
   filter: alpha(opacity=0);
   -o-transform: translate(0, -300px) scale(6);
+  -moz-transform: translate(-300px, 0) scale(6);
   cursor: pointer;
   z-index: 2;
 }
