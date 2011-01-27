@@ -10,6 +10,9 @@
     #sortable { list-style-type: none; margin: 0; padding: 0; width: 60%; }
     #sortable li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1em; height: 18px; }
     #sortable li span { position: absolute; margin-left: -1.3em; }
+    #sortable2 { list-style-type: none; margin: 0; padding: 0; width: 60%; }
+    #sortable2 li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1em; height: 18px; }
+    #sortable2 li span { position: absolute; margin-left: -1.3em; }
     .ui-state-highlight { height: 1.5em; line-height: 1.2em; }
   </style>
   <script src="js/jquery-1.4.4.min.js"></script>
@@ -49,7 +52,6 @@
   });
   </script> 
   <script type="text/javascript">
-  var mp3_list = $("#sortable");
 
   var listedMp3s = {};
 
@@ -59,7 +61,68 @@
       });
   }
 
-  function load_mp3s() {
+	function getItems()
+	{
+		var columns = [];
+		$("#sortable").each(function(){
+			columns.push($(this).sortable('toArray').join(','));				
+		});
+    console.log(typeof(colums));
+		res = columns.join('|');
+    console.log('res:' + res);
+		return res;
+	}
+
+  function renderItems(citems)
+	{
+		var html = '';
+		var columns = citems.split('|');
+		for ( var c in columns )
+		{
+			html += '<div class="column left';
+			if ( c === 0 )
+			{
+				html += ' first';
+			}
+			html += '"><ul id="sortable2" class="sortable-list">';
+			if ( columns[c] !== '' )
+			{
+				var items = columns[c].split(',');
+				for ( var i in items )
+				{
+					// html += '<li class="sortable-item" id="' + items[i] + '">Sortable item ' + items[i] + '</li>';
+          html += '<li id=' + items[i] + 
+                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/content/' +
+                  items[i] + '">' + items[i] + '<\/a><\/li>';
+				}
+			}
+			html += '</ul></div>';
+		}
+
+		$('#renderarea').html(html);
+    $( "#sortable2" ).sortable({
+      placeholder: "ui-state-highlight"
+    });
+    $( "#sortable2" ).disableSelection();
+	}
+  var serverStateCheckSum = 0;
+  function checkForUpdated() {
+  	console.log("checking for updates...");
+    $.get("/sha1", function(sha1) {
+    	  var old = serverStateCheckSum;
+        serverStateCheckSum = sha1;
+    	  if (sha1 !== old) {
+          console.log("needs update! sha1:" + sha1);
+          setTimeout(loadMp3s,1);
+        }
+        else {
+          console.log("nothing changed... sha1:" + sha1);
+          setTimeout(checkForUpdated,5000);
+        }
+    });
+ 	
+  }
+  function loadMp3s() {
     function compareMp3s(a,b){
         return (a.name > b.name) ? 1 : -1;
     }
@@ -73,18 +136,17 @@
           {
             listedMp3s[this.name] = true;
             var newItem = '<li id=' + this.name + 
-                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"></span><a href="/content/' +
-                  this.name  + '">' + this.name + '</a></li>';
-            // <li class="ui-state-default"><span class="ui-icon ui-icon-volume-on"></span><a href="http://www.spiegel.de">Item 1</a></li>
+                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/content/' +
+                  this.name  + '">' + this.name + '<\/a><\/li>';
             $("#sortable").append(newItem);
             $("#sortable").sortable('refresh');
           }
         });
       }
-      setTimeout(load_mp3s,2500);
+      setTimeout(checkForUpdated,5000);
     });
   }
-  setTimeout(load_mp3s, 1000);
+  setTimeout(checkForUpdated, 1000);
   </script>
 </head>
 <body>
@@ -99,9 +161,21 @@
 
 <ul id="sortable">
 </ul>
+<div class="column left first">
 
+  <ul class="sortable-list">
+    <li class="sortable-item" id="A">Sortable item A</li>
+    <li class="sortable-item" id="B">Sortable item B</li>
+  </ul>
+
+</div>
+
+
+
+<div id="renderarea"></div>
 <div id="manageDiv"><h2>Manage mp3 list</h2></div>
-<button type="button" onclick="clearMp3s()">clear all items</button>
+<button type="button" onclick="clearMp3s();">clear all items</button>
+<button type="button" onclick="renderItems(getItems());">show all items</button>
 
 </body> 
 </html>

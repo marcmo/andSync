@@ -9,6 +9,7 @@ var fs = require('fs'),
     events = require("events"),
     jquery = require("jquery"),
     crypto = require("crypto"),
+    cryptoHelper = require("cryptoHelper"),
     syncUtil = require("syncUtil");
 
 global.puts = futil.puts;
@@ -82,9 +83,16 @@ function startServer(){
       }).on('end', function() {
         puts('-> upload done');
         res.writeHead(200, {'content-type': 'text/plain'});
-        res.write('received fields:\n\n '+util.inspect(fields));
-        res.write('\n\n');
-        res.end('received files:\n\n '+util.inspect(files));
+        //'received fields:\n\n '+util.inspect(fields) + '\n\n' + 'received files:\n\n '+util.inspect(files);
+        var responseText = {
+			"received fields":util.inspect(fields),
+			"received files":util.inspect(files)
+		};  
+        res.write(JSON.stringify(responseText));
+        res.end();
+        // res.write('received fields:\n\n '+util.inspect(fields));
+        // res.write('\n\n');
+        // res.end('received files:\n\n '+util.inspect(files));
         console.log("end...expected " + form.bytesExpected + " bytes, received " + form.bytesReceived + " bytes.");
         console.log("currentFile: " + currentFile.filename);
         fs.rename(currentFile.path,
@@ -95,6 +103,11 @@ function startServer(){
     } else if(req.url === "/content") {  
       res.writeHead(200, { "Content-Type" : "text/plain" });  
       res.write(JSON.stringify(myMp3List));  
+      res.end();  
+    } else if(req.url === "/sha1") {  
+      console.log("sending back sha1:" + mp3CheckSum);
+      res.writeHead(200, { "Content-Type" : "text/plain" });  
+      res.write("" + mp3CheckSum);
       res.end();  
     } else if(req.url === "/clear") {  
       res.writeHead(200, { "Content-Type" : "text/plain" });  
@@ -134,8 +147,8 @@ function startServer(){
 }
 
 var myMp3List = [];
-function get_mp3_list(mp3List) {
-  console.log("get_mp3_list() function..." + mp3List);
+function rebuildMp3List(mp3List) {
+  console.log("rebuildMp3List() function..." + mp3List);
   myMp3List = jquery.map(mp3List, function(v){
     return {
       name:path.basename(v),
@@ -144,11 +157,19 @@ function get_mp3_list(mp3List) {
     };  
   });
 }
+var mp3CheckSum = 0;
+function updateChecksum(files){
+    cryptoHelper.calcSha1(files,function (res) {
+	  console.log('checksums: old:' + mp3CheckSum + ', new:' + res);
+      mp3CheckSum = res;
+    });
+}
 
 function updateMp3List() {
   console.log(util.inspect(process.memoryUsage()));
   syncUtil.flatten(MP3DIR, function(dirList) {
-    get_mp3_list(dirList);
+    rebuildMp3List(dirList);
+    updateChecksum(dirList);
   });
 }
 
