@@ -19,13 +19,14 @@ global.p = function() {
 global.PORT = 8080;
 global.UPLOADDIR = path.join(__dirname, 'uploadDir');
 global.MP3DIR = path.join(__dirname, 'mp3Folder');
+global.USERDIR = path.join(__dirname, 'users');
 
 syncUtil.ensureDirectory(UPLOADDIR, function() {
   syncUtil.ensureDirectory(MP3DIR, startServer);
 });
 
-function serve_static_file(uri, res) {
-  console.log("serve_static_file, uri was:" + uri);
+function serveStaticFile(uri, res) {
+  console.log("serveStaticFile, uri was:" + uri);
   var filename = path.join(process.cwd(), uri);
   path.exists(filename, function(exists) {
     if(!exists) {
@@ -69,15 +70,13 @@ function startServer(){
       form.on('field', function(field, value) {
         p([field, value]);
         fields.push([field, value]);
-        console.log("field...expected bytes:" + form.bytesExpected);
-        console.log("field...received bytes:" + form.bytesReceived);
+        console.log("field...expected bytes:" + form.bytesExpected + "received:" + form.bytesReceived);
       }).on('file', function(field, file) {
         p([field, file]);
         console.log(util.inspect(file));
         console.log(file.length);
         files.push([field, file]);
         currentFile = file;
-        console.log("currentFile: " + currentFile);
         console.log("on...pushed: field:" + field + ",file:" + file);
         var x = crypto.createHash('sha1').update(file).digest('hex');
         console.log("hash:" + x);
@@ -96,10 +95,25 @@ function startServer(){
           updateMp3List);
       });
       form.parse(req);
+    } else if(req.url === "/users") {  
+		fs.readdir(USERDIR,function (err,files){
+			var paths = jquery.map(files,function(v){return path.join(USERDIR,v);});
+			var userDirs = [];
+			jquery.map(paths, function(v,i){
+				var s = fs.statSync(v);
+				if (s.isDirectory()) {
+					console.log("is a user:" + s);
+					userDirs.push(path.basename(v));
+				} 
+			});
+		res.writeHead(200, { "Content-Type" : "text/plain" });  
+		res.write(JSON.stringify(userDirs));  
+		res.end();  
+		});
     } else if(req.url === "/content") {  
-      res.writeHead(200, { "Content-Type" : "text/plain" });  
-      res.write(JSON.stringify(myMp3List));  
-      res.end();  
+		res.writeHead(200, { "Content-Type" : "text/plain" });  
+		res.write(JSON.stringify(myMp3List));  
+		res.end();  
     } else if(req.url === "/sha1") {  
       console.log("sending back sha1:" + mp3CheckSum);
       res.writeHead(200, { "Content-Type" : "text/plain" });  
@@ -126,11 +140,11 @@ function startServer(){
     } else if (contentRegex.test(req.url)) {
       console.log("content url was:" + req.url);
       var matchedMp3 = contentRegex.exec(req.url)[1];
-      serve_static_file(path.join("mp3Folder",unescape(matchedMp3)),res);
+      serveStaticFile(path.join("mp3Folder",unescape(matchedMp3)),res);
     } else if (req.url.match("^\/script")) {
       console.log("was a script,url:"+req.url);
       var uri = url.parse(req.url).pathname;  
-      serve_static_file(uri,res);
+      serveStaticFile(uri,res);
     } else {
       console.log("was an s.th. else: " + req.url);
       res.writeHead(404, {'content-type': 'text/plain'});
