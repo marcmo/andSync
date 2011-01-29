@@ -74,6 +74,7 @@ function startServer(){
       }).on('file', function(field, file) {
         p([field, file]);
         console.log(util.inspect(file));
+        console.log(file.length);
         files.push([field, file]);
         currentFile = file;
         console.log("currentFile: " + currentFile);
@@ -83,18 +84,13 @@ function startServer(){
       }).on('end', function() {
         puts('-> upload done');
         res.writeHead(200, {'content-type': 'text/plain'});
-        //'received fields:\n\n '+util.inspect(fields) + '\n\n' + 'received files:\n\n '+util.inspect(files);
-        var responseText = {
-			"received fields":util.inspect(fields),
-			"received files":util.inspect(files)
-		};  
-        res.write(JSON.stringify(responseText));
+        var responseObject = [];
+		jquery.map(files, function(f){
+			responseObject.push({name:f[1].filename,size:f[1].length});
+		});
+        res.write(JSON.stringify(responseObject));
         res.end();
-        // res.write('received fields:\n\n '+util.inspect(fields));
-        // res.write('\n\n');
-        // res.end('received files:\n\n '+util.inspect(files));
         console.log("end...expected " + form.bytesExpected + " bytes, received " + form.bytesReceived + " bytes.");
-        console.log("currentFile: " + currentFile.filename);
         fs.rename(currentFile.path,
           path.join(MP3DIR,currentFile.filename),
           updateMp3List);

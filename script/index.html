@@ -28,7 +28,7 @@
           buildUploadRow: function (files, index) {
               var file = files[index];
               return $(
-                  '<tr style="display:none">' +
+                  '<tr>' +
                   '<td>' + file.name + '<\/td>' +
                   '<td class="file_upload_progress"><div><\/div><\/td>' +
                   '<td class="file_upload_cancel">' +
@@ -40,9 +40,6 @@
               );
           },
           buildDownloadRow: function (file) {
-              return $(
-                  '<tr style="display:none"><td>' + file.name + '<\/td><\/tr>'
-              );
           }
       });
       $( "#sortable" ).sortable({
@@ -90,7 +87,6 @@
 				var items = columns[c].split(',');
 				for ( var i in items )
 				{
-					// html += '<li class="sortable-item" id="' + items[i] + '">Sortable item ' + items[i] + '</li>';
           html += '<li id=' + items[i] + 
                   ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/content/' +
                   items[i] + '">' + items[i] + '<\/a><\/li>';
@@ -163,14 +159,9 @@
 </ul>
 <div class="column left first">
 
-  <ul class="sortable-list">
-    <li class="sortable-item" id="A">Sortable item A</li>
-    <li class="sortable-item" id="B">Sortable item B</li>
-  </ul>
-
 </div>
 
-
+<br>
 
 <div id="renderarea"></div>
 <div id="manageDiv"><h2>Manage mp3 list</h2></div>
