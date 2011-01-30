@@ -51,7 +51,7 @@
 
         $('.error').hide();
         var name = $("input#name").val();
-        if (name == "") {
+        if (name === "") {
           $("label#name_error").show();
           $("input#name").focus();
           return false;
@@ -63,8 +63,8 @@
           url: "/user/new",
           data: dataString,
           success: function() {
-            $('#newUserForm').html("<div id='message'></div>");
-            $('#message').html("<h2>new user created!</h2>")
+            $('#newUserForm').html("<div id='message'><\/div>");
+            $('#message').html("<h2>new user created!<\/h2>")
             .hide()
             .fadeIn(1000, function() {
               $('#message').append("<img id='checkmark' src='images/check.png' />");
@@ -91,56 +91,56 @@
       });
   }
 
-	function getItems()
-	{
-		var columns = [];
-		$("#sortable").each(function(){
-			columns.push($(this).sortable('toArray').join(','));				
-		});
+  function getItems()
+  {
+    var columns = [];
+    $("#sortable").each(function(){
+      columns.push($(this).sortable('toArray').join(','));        
+    });
     console.log(typeof(colums));
-		res = columns.join('|');
+    res = columns.join('|');
     console.log('res:' + res);
-		return res;
-	}
+    return res;
+  }
 
   function renderItems(citems)
-	{
-		var html = '';
-		var columns = citems.split('|');
-		for ( var c in columns )
-		{
-			html += '<div class="column left';
-			if ( c === 0 )
-			{
-				html += ' first';
-			}
-			html += '"><ul id="sortable2" class="sortable-list">';
-			if ( columns[c] !== '' )
-			{
-				var items = columns[c].split(',');
-				for ( var i in items )
-				{
+  {
+    var html = '';
+    var columns = citems.split('|');
+    for (var c = 0; c < columns.length; c++)
+    {
+      html += '<div class="column left';
+      if ( c === 0 )
+      {
+        html += ' first';
+      }
+      html += '"><ul id="sortable2" class="sortable-list">';
+      if ( columns[c] !== '' )
+      {
+        var items = columns[c].split(',');
+        for (var i = 0; i < items.length; i++)
+        {
           html += '<li id=' + items[i] + 
                   ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/content/' +
                   items[i] + '">' + items[i] + '<\/a><\/li>';
-				}
-			}
-			html += '</ul></div>';
-		}
+        }
+      }
+      html += '<\/ul><\/div>';
+    }
 
-		$('#renderarea').html(html);
+    $('#renderarea').html(html);
     $( "#sortable2" ).sortable({
       placeholder: "ui-state-highlight"
     });
     $( "#sortable2" ).disableSelection();
-	}
+  }
   var serverStateCheckSum = 0;
   function checkForUpdated() {
-  	console.log("checking for updates...");
+    console.log("checking for updates...");
     $.get("/sha1", function(sha1) {
-    	  var old = serverStateCheckSum;
+        var old = serverStateCheckSum;
         serverStateCheckSum = sha1;
-    	  if (sha1 !== old) {
+        if (sha1 !== old) {
           console.log("needs update! sha1:" + sha1);
           setTimeout(loadMp3s,1);
         }
@@ -149,7 +149,7 @@
           setTimeout(checkForUpdated,5000);
         }
     });
- 	
+  
   }
   function loadMp3s() {
     function compareMp3s(a,b){
@@ -204,12 +204,12 @@
 <div id="newUserForm">
 <form name="userCreation" action="">
   <fieldset>
+    <h3>Create new user</h3>
     <label for="name" id="name_label">Name</label>
     <input type="text" name="name" id="name" size="30" value="" class="text-input" />
     <label class="error" for="name" id="name_error">This field is required.</label>
-
     <br />
-    <input type="submit" name="submit" class="button" id="submit_btn" value="Send" />
+    <input type="submit" name="submit" class="button" id="submit_btn" value="create" />
   </fieldset>
 </form>
 </div>

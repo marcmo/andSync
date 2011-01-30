@@ -20,9 +20,25 @@ global.PORT = 8080;
 global.UPLOADDIR = path.join(__dirname, 'uploadDir');
 global.MP3DIR = path.join(__dirname, 'mp3Folder');
 global.USERDIR = path.join(__dirname, 'users');
+global.USERS = [];
 
 syncUtil.ensureDirectory(UPLOADDIR, function() {
-  syncUtil.ensureDirectory(MP3DIR, startServer);
+  syncUtil.ensureDirectory(MP3DIR, function() {
+    syncUtil.ensureDirectory(USERDIR, function() {
+      fs.readdir(USERDIR,function (err,files){
+        var paths = jquery.map(files,function(v){return path.join(USERDIR,v);});
+        jquery.map(paths, function(v,i){
+          var s = fs.statSync(v);
+          if (s.isDirectory()) {
+            console.log("is a user:" + s);
+            USERS.push(path.basename(v));
+          } 
+        });
+        console.log("known users: " + USERS);
+        startServer();
+      });
+    });
+  });
 });
 
 function serveStaticFile(uri, res) {
@@ -95,20 +111,9 @@ function startServer(){
       });
       form.parse(req);
     } else if(req.url === "/users") {  
-		fs.readdir(USERDIR,function (err,files){
-			var paths = jquery.map(files,function(v){return path.join(USERDIR,v);});
-			var userDirs = [];
-			jquery.map(paths, function(v,i){
-				var s = fs.statSync(v);
-				if (s.isDirectory()) {
-					console.log("is a user:" + s);
-					userDirs.push(path.basename(v));
-				} 
-			});
-		res.writeHead(200, { "Content-Type" : "text/plain" });  
-		res.write(JSON.stringify(userDirs));  
-		res.end();  
-		});
+      res.writeHead(200, { "Content-Type" : "text/plain" });  
+      res.write(JSON.stringify(USERS));  
+      res.end();  
     } else if(req.url === "/content") {  
 		res.writeHead(200, { "Content-Type" : "text/plain" });  
 		res.write(JSON.stringify(myMp3List));  
@@ -144,42 +149,41 @@ function startServer(){
       console.log("was a script,url:"+req.url);
       var uri = url.parse(req.url).pathname;  
       serveStaticFile(uri,res);
-	} else if (req.url == '/user/new') {
-		var form = new formidable.IncomingForm(),
-		fields = [];
-		form
-		.on('error', function(err) {
-			res.writeHead(200, {'content-type': 'text/plain'});
-			res.end('error:\n\n'+util.inspect(err));
-		})
-		.on('field', function(field, value) {
-			p([field, value]);
-			console.log('got new field:' + field + ',value:' + value);
-			fields.push(value);
-		})
-		.on('end', function() {
-			jquery.map(fields, function(v){
-				var newFolder = path.join(USERDIR,v);
-				path.exists(newFolder, function (exists) {
-					if (!exists){
-						fs.mkdirSync(newFolder,0777);
-					}
-				});
-			});
-			puts('-> post done');
-			res.writeHead(200, {'content-type': 'text/plain'});
-			res.end('received fields:\n\n '+util.inspect(fields));
-		});
-		form.parse(req);
+    // } else if (req.url.match("^\/user")) {
+
+    } else if (req.url == '/user/new') {
+      var form = new formidable.IncomingForm(),
+      fields = [];
+      form
+      .on('error', function(err) {
+        res.writeHead(200, {'content-type': 'text/plain'});
+        res.end('error:\n\n'+util.inspect(err));
+      })
+      .on('field', function(field, value) {
+        p([field, value]);
+        console.log('got new field:' + field + ',value:' + value);
+        fields.push(value);
+        USERS.push(value);
+      })
+      .on('end', function() {
+        var newFolders = jquery.map(fields, function(v){ return path.join(USERDIR,v); });
+        console.log("new users:" + fields);
+        syncUtil.asyncMap(newFolders,
+            function(x,cb){fs.mkdir(x,0777,cb);}, // partial function application
+            function(x){
+              puts('-> post done');
+              res.writeHead(200, {'content-type': 'text/plain'});
+              res.end('received fields:\n\n '+util.inspect(fields));
+              console.log('done!'+x);
+            }); // done callback
+      });
+      form.parse(req);
     } else {
-      console.log("was an s.th. else: " + req.url);
       res.writeHead(404, {'content-type': 'text/plain'});
       res.end('404');
     }
-
   });
   server.listen(PORT);
-
   util.puts('listening on http://localhost:'+PORT+'/');
 }
 
