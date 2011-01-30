@@ -46,6 +46,34 @@
         placeholder: "ui-state-highlight"
       });
       $( "#sortable" ).disableSelection();
+      $('.error').hide();
+      $(".button").click(function() {
+
+        $('.error').hide();
+        var name = $("input#name").val();
+        if (name == "") {
+          $("label#name_error").show();
+          $("input#name").focus();
+          return false;
+        }
+        
+        var dataString = 'name='+ name;
+        $.ajax({
+          type: "POST",
+          url: "/user/new",
+          data: dataString,
+          success: function() {
+            $('#newUserForm').html("<div id='message'></div>");
+            $('#message').html("<h2>new user created!</h2>")
+            .hide()
+            .fadeIn(1000, function() {
+              $('#message').append("<img id='checkmark' src='images/check.png' />");
+            });
+          }
+        });
+        return false;
+      });
+      
   });
   </script> 
   <script type="text/javascript">
@@ -55,6 +83,11 @@
   function clearMp3s() {
     $.getJSON("/clear", function(mp3s) {
         console.log(mp3s);
+      });
+  }
+  function getUsers() {
+    $.getJSON("/users", function(users) {
+        console.log(users);
       });
   }
 
@@ -142,7 +175,7 @@
       setTimeout(checkForUpdated,5000);
     });
   }
-  setTimeout(checkForUpdated, 1000);
+  setTimeout(checkForUpdated, 2000);
   </script>
 </head>
 <body>
@@ -167,6 +200,20 @@
 <div id="manageDiv"><h2>Manage mp3 list</h2></div>
 <button type="button" onclick="clearMp3s();">clear all items</button>
 <button type="button" onclick="renderItems(getItems());">show all items</button>
+<button type="button" onclick="getUsers();">get users</button>
+<div id="newUserForm">
+<form name="userCreation" action="">
+  <fieldset>
+    <label for="name" id="name_label">Name</label>
+    <input type="text" name="name" id="name" size="30" value="" class="text-input" />
+    <label class="error" for="name" id="name_error">This field is required.</label>
+
+    <br />
+    <input type="submit" name="submit" class="button" id="submit_btn" value="Send" />
+  </fieldset>
+</form>
+</div>
+ 
 
 </body> 
 </html>

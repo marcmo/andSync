@@ -44,7 +44,6 @@ function serveStaticFile(uri, res) {
         res.end();  
         return;  
       }  
-      console.log("ok.." + filename +"....did exist");
       res.writeHead(200);  
       res.write(file, "binary");  
       res.end();  
@@ -145,11 +144,39 @@ function startServer(){
       console.log("was a script,url:"+req.url);
       var uri = url.parse(req.url).pathname;  
       serveStaticFile(uri,res);
+	} else if (req.url == '/user/new') {
+		var form = new formidable.IncomingForm(),
+		fields = [];
+		form
+		.on('error', function(err) {
+			res.writeHead(200, {'content-type': 'text/plain'});
+			res.end('error:\n\n'+util.inspect(err));
+		})
+		.on('field', function(field, value) {
+			p([field, value]);
+			console.log('got new field:' + field + ',value:' + value);
+			fields.push(value);
+		})
+		.on('end', function() {
+			jquery.map(fields, function(v){
+				var newFolder = path.join(USERDIR,v);
+				path.exists(newFolder, function (exists) {
+					if (!exists){
+						fs.mkdirSync(newFolder,0777);
+					}
+				});
+			});
+			puts('-> post done');
+			res.writeHead(200, {'content-type': 'text/plain'});
+			res.end('received fields:\n\n '+util.inspect(fields));
+		});
+		form.parse(req);
     } else {
       console.log("was an s.th. else: " + req.url);
       res.writeHead(404, {'content-type': 'text/plain'});
       res.end('404');
     }
+
   });
   server.listen(PORT);
 
