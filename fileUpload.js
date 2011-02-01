@@ -71,7 +71,52 @@ function serveStaticFile(uri, res) {
 function startServer(){
   var server = http.createServer(function(req, res) {
     console.log("server: req:" + req.url);
-    if (req.url.match("^\/script")) {
+    var userUploadRegex = /\/user\/upload\/(.*)/i;
+    if (userUploadRegex.test(req.url)) {
+      var matchedUser = userUploadRegex.exec(req.url)[1];
+      console.log("was an upload for:" + matchedUser);
+      var form = new formidable.IncomingForm(),
+      files = [],
+      fields = [],
+      currentFile;
+
+      form.uploadDir = UPLOADDIR;
+      form.keepExtensions = true;
+
+      form.on('field', function(field, value) {
+        p([field, value]);
+        fields.push([field, value]);
+        console.log("field...expected bytes:" + form.bytesExpected);
+        console.log("field...received bytes:" + form.bytesReceived);
+      }).on('file', function(field, file) {
+        p([field, file]);
+        console.log(util.inspect(file));
+        console.log(file.length);
+        files.push([field, file]);
+        currentFile = file;
+        console.log("currentFile: " + currentFile);
+        console.log("on...pushed: field:" + field + ",file:" + file);
+        var x = crypto.createHash('sha1').update(file).digest('hex');
+        console.log("hash:" + x);
+      }).on('end', function() {
+        puts('-> upload done');
+        res.writeHead(200, {'content-type': 'text/plain'});
+        var responseObject = [];
+        jquery.map(files, function(f){
+          responseObject.push({name:f[1].filename,size:f[1].length});
+        });
+        console.log("end...expected " + form.bytesExpected + " bytes, received " + form.bytesReceived + " bytes.");
+        console.log("copy from to:" + currentFile.path + " to -> " +  path.join(path.join(USERDIR,matchedUser),currentFile.filename));
+        fs.rename(currentFile.path,
+          path.join(path.join(USERDIR,matchedUser),currentFile.filename),
+          updateMp3List(matchedUser,function(){
+              res.write(JSON.stringify(responseObject));
+              res.end();
+          }));
+      });
+      form.parse(req);
+    
+    } else if (req.url.match("^\/script")) {
       var uri = url.parse(req.url).pathname;  
       serveStaticFile(uri,res);
     } else if (req.url.match("^\/user\/")) {
