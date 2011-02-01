@@ -71,52 +71,7 @@ function serveStaticFile(uri, res) {
 function startServer(){
   var server = http.createServer(function(req, res) {
     console.log("server: req:" + req.url);
-    var userUploadRegex = /\/user\/upload\/(.*)/i;
-    if (userUploadRegex.test(req.url)) {
-      var matchedUser = userUploadRegex.exec(req.url)[1];
-      console.log("was an upload for:" + matchedUser);
-      var form = new formidable.IncomingForm(),
-      files = [],
-      fields = [],
-      currentFile;
-
-      form.uploadDir = UPLOADDIR;
-      form.keepExtensions = true;
-
-      form.on('field', function(field, value) {
-        p([field, value]);
-        fields.push([field, value]);
-        console.log("field...expected bytes:" + form.bytesExpected);
-        console.log("field...received bytes:" + form.bytesReceived);
-      }).on('file', function(field, file) {
-        p([field, file]);
-        console.log(util.inspect(file));
-        console.log(file.length);
-        files.push([field, file]);
-        currentFile = file;
-        console.log("currentFile: " + currentFile);
-        console.log("on...pushed: field:" + field + ",file:" + file);
-        var x = crypto.createHash('sha1').update(file).digest('hex');
-        console.log("hash:" + x);
-      }).on('end', function() {
-        puts('-> upload done');
-        res.writeHead(200, {'content-type': 'text/plain'});
-        var responseObject = [];
-        jquery.map(files, function(f){
-          responseObject.push({name:f[1].filename,size:f[1].length});
-        });
-        console.log("end...expected " + form.bytesExpected + " bytes, received " + form.bytesReceived + " bytes.");
-        console.log("copy from to:" + currentFile.path + " to -> " +  path.join(path.join(USERDIR,matchedUser),currentFile.filename));
-        fs.rename(currentFile.path,
-          path.join(path.join(USERDIR,matchedUser),currentFile.filename),
-          updateMp3List(matchedUser,function(){
-              res.write(JSON.stringify(responseObject));
-              res.end();
-          }));
-      });
-      form.parse(req);
-    
-    } else if (req.url.match("^\/script")) {
+    if (req.url.match("^\/script")) {
       var uri = url.parse(req.url).pathname;  
       serveStaticFile(uri,res);
     } else if (req.url.match("^\/user\/")) {
@@ -131,7 +86,12 @@ function startServer(){
 }
 
 function handleUserOperation(req,res){
-  if (req.url == '/user/new') {
+    var userUploadRegex = /\/user\/upload\/(.*)/i;
+    if (userUploadRegex.test(req.url)) {
+      var matchedUser = userUploadRegex.exec(req.url)[1];
+      console.log("was an upload for:" + matchedUser);
+      handleUpload(req,res,matchedUser);
+    } else if (req.url == '/user/new') {
     var form = new formidable.IncomingForm(),
     fields = [];
     form
@@ -226,30 +186,21 @@ function singleUserOp(req,res,user,op){
 }
 
 function handleUpload(req,res,user){
-  console.log("was an upload for:" + user);
   var form = new formidable.IncomingForm(),
   files = [],
   fields = [],
   currentFile;
 
-  console.log("1");
   form.uploadDir = UPLOADDIR;
   form.keepExtensions = true;
+
   form.on('field', function(field, value) {
-    console.log("2");
     p([field, value]);
     fields.push([field, value]);
-    console.log("field...expected bytes:" + form.bytesExpected + "received:" + form.bytesReceived);
   }).on('file', function(field, file) {
-    console.log("3");
     p([field, file]);
-    console.log(util.inspect(file));
-    console.log(file.length);
     files.push([field, file]);
     currentFile = file;
-    console.log("on...pushed: field:" + field + ",file:" + file);
-    var x = crypto.createHash('sha1').update(file).digest('hex');
-    console.log("hash:" + x);
   }).on('end', function() {
     puts('-> upload done');
     res.writeHead(200, {'content-type': 'text/plain'});
@@ -257,17 +208,17 @@ function handleUpload(req,res,user){
     jquery.map(files, function(f){
       responseObject.push({name:f[1].filename,size:f[1].length});
     });
-    console.log("end...expected " + form.bytesExpected + " bytes, received " + form.bytesReceived + " bytes.");
+    console.log("copy from to:" + currentFile.path + " to -> " +  path.join(path.join(USERDIR,user),currentFile.filename));
     fs.rename(currentFile.path,
-      path.join(MP3DIR,currentFile.filename),
-      function(){updateMp3List(user,function(){
-          res.write(JSON.stringify(responseObject));
-          res.end();
+      path.join(path.join(USERDIR,user),currentFile.filename),
+      function(){
+        updateMp3List(user,function(){
+            res.write(JSON.stringify(responseObject));
+            res.end();
         });
-      });
+      }
+      );
   });
-  console.log('parsing req:' + req);
-  console.log(util.inspect(req));
   form.parse(req);
 }
 
@@ -293,6 +244,8 @@ function updateChecksum(user,files,callback){
 
 function updateMp3List(user,callback) {
   var userDir = path.join(USERDIR,user);
+  var xs = fs.readdirSync(userDir);
+  console.log("sync result:" + xs);
   // console.log(util.inspect(process.memoryUsage()));
   syncUtil.flatten(userDir, function(dirList) {
     rebuildMp3List(user, dirList);
