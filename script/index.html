@@ -13,6 +13,11 @@
     #sortable2 { list-style-type: none; margin: 0; padding: 0; width: 60%; }
     #sortable2 li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1em; height: 18px; }
     #sortable2 li span { position: absolute; margin-left: -1.3em; }
+    #feedback { font-size: 1.4em; }
+    #selectableUsers .ui-selecting { background: #FECA40; }
+    #selectableUsers .ui-selected { background: #F39814; color: white; }
+    #selectableUsers { list-style-type: none; margin: 0; padding: 0; width: 60%; }
+    #selectableUsers li { margin: 3px; padding: 0.4em; font-size: 1.4em; height: 18px; }
     .ui-state-highlight { height: 1.5em; line-height: 1.2em; }
   </style>
   <script src="js/jquery-1.4.4.min.js"></script>
@@ -21,6 +26,7 @@
   <script src="js/jquery.fileupload-ui.js"></script>
   <script>
   /*global $ */
+  var currentUser = "";
   $(function () {
       $('.upload').fileUploadUI({
           uploadTable: $('.upload_files'),
@@ -46,6 +52,18 @@
         placeholder: "ui-state-highlight"
       });
       $( "#sortable" ).disableSelection();
+      $( "#selectableUsers" ).selectable({
+        stop: function() {
+          var result = $( "#select-result" ).empty();
+          $( ".ui-selected", this ).each(function() {
+            var index = $( "#selectableUsers li" ).index( this );
+            var selectedUser = $( "#selectableUsers li:nth-child(" + (index+1) + ")" ).text();
+            result.append( " #" + ( index + 1 ) + ' ' + selectedUser);
+            currentUser = selectedUser;
+            checkForUpdated();
+          });
+        }
+      });
       $('.error').hide();
       $(".button").click(function() {
 
@@ -107,19 +125,15 @@
   {
     var html = '';
     var columns = citems.split('|');
-    for (var c = 0; c < columns.length; c++)
-    {
+    for (var c = 0; c < columns.length; c++) {
       html += '<div class="column left';
-      if ( c === 0 )
-      {
+      if ( c === 0 ) {
         html += ' first';
       }
       html += '"><ul id="sortable2" class="sortable-list">';
-      if ( columns[c] !== '' )
-      {
+      if ( columns[c] !== '' ) {
         var items = columns[c].split(',');
-        for (var i = 0; i < items.length; i++)
-        {
+        for (var i = 0; i < items.length; i++) {
           html += '<li id=' + items[i] + 
                   ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/content/' +
                   items[i] + '">' + items[i] + '<\/a><\/li>';
@@ -127,17 +141,23 @@
       }
       html += '<\/ul><\/div>';
     }
-
     $('#renderarea').html(html);
-    $( "#sortable2" ).sortable({
-      placeholder: "ui-state-highlight"
-    });
+    $( "#sortable2" ).sortable({ placeholder: "ui-state-highlight" });
     $( "#sortable2" ).disableSelection();
   }
+
   var serverStateCheckSum = 0;
+  function getCurrentUsers() {
+    $.getJSON("/user/list", function(users) {
+    	  console.log(users);
+        $.map(users, function(u) {
+          $("#selectableUsers").append('<li class="ui-widget-content"><a href="/user/' + u + '/content">' + u + '</a></li>');
+          });
+    });
+  }
   function checkForUpdated() {
     console.log("checking for updates...");
-    $.get("/sha1", function(sha1) {
+    $.get("/user/" + currentUser + "/sha1", function(sha1) {
         var old = serverStateCheckSum;
         serverStateCheckSum = sha1;
         if (sha1 !== old) {
@@ -149,13 +169,12 @@
           setTimeout(checkForUpdated,5000);
         }
     });
-  
   }
   function loadMp3s() {
     function compareMp3s(a,b){
         return (a.name > b.name) ? 1 : -1;
     }
-    $.getJSON("/content", function(mp3s) {
+    $.getJSON("/user/" + currentUser + "/content", function(mp3s) {
 
       console.log(mp3s);
 
@@ -165,7 +184,7 @@
           {
             listedMp3s[this.name] = true;
             var newItem = '<li id=' + this.name + 
-                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/content/' +
+                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/' + currentUser + '/content/get/' +
                   this.name  + '">' + this.name + '<\/a><\/li>';
             $("#sortable").append(newItem);
             $("#sortable").sortable('refresh');
@@ -175,11 +194,26 @@
       setTimeout(checkForUpdated,5000);
     });
   }
-  setTimeout(checkForUpdated, 2000);
+  setTimeout(getCurrentUsers, 2000);
+  function createGetContentString(){
+  	return "/user/upload/"+currentUser;
+  }
   </script>
 </head>
 <body>
-<form class="upload" action="/upload" method="POST" enctype="multipart/form-data">
+<ol id="userList"> 
+</ol> 
+<div class="userlist">
+<p id="feedback">
+<span>selected user:</span> <span id="select-result">none</span>.
+</p>
+
+<ol id="selectableUsers">
+</ol>
+</div><!-- End userlist -->
+  
+<form class="upload" action="/user/oli/upload" method="POST" enctype="multipart/form-data">
+<!-- <form class="upload" action="createGetContentString()" method="POST" enctype="multipart/form-data"> -->
     <input type="file" name="file" multiple>
     <button>Upload</button>
     <div>drag music files here</div>

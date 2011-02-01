@@ -35,17 +35,15 @@ syncUtil.ensureDirectory(UPLOADDIR, function() {
           } 
         });
         console.log("known users: " + USERS);
-
-        syncUtil.asyncMap(USERS,
+        syncUtil.asyncMap(USERS.slice(), // pass in a copy
             function(u,cb){ updateMp3List(u,cb); },
-            startServer); // done callback
+            startServer);
       });
     });
   });
 });
 
 function serveStaticFile(uri, res) {
-  console.log("serveStaticFile, uri was:" + uri);
   var filename = path.join(process.cwd(), uri);
   path.exists(filename, function(exists) {
     if(!exists) {
@@ -73,13 +71,7 @@ function serveStaticFile(uri, res) {
 function startServer(){
   var server = http.createServer(function(req, res) {
     console.log("server: req:" + req.url);
-    var contentRegex = /\/content\/(.*\.\w*)/i;
-    if (contentRegex.test(req.url)) {
-      console.log("content url was:" + req.url);
-      var matchedMp3 = contentRegex.exec(req.url)[1];
-      serveStaticFile(path.join("mp3Folder",unescape(matchedMp3)),res);
-    } else if (req.url.match("^\/script")) {
-      console.log("was a script,url:"+req.url);
+    if (req.url.match("^\/script")) {
       var uri = url.parse(req.url).pathname;  
       serveStaticFile(uri,res);
     } else if (req.url.match("^\/user\/")) {
@@ -144,7 +136,13 @@ function handleUserOperation(req,res){
 }
 
 function singleUserOp(req,res,user,op){
-  if (op === 'content') {
+  console.log("content url was:" + req.url + ',op:' + op);
+  var contentRegex = /\/content\/get\/(.*\.\w*)/i;
+  var userDir = path.join(USERDIR,user);
+  if (contentRegex.test(op)) {
+    var matchedMp3 = contentRegex.exec(op)[1];
+    serveStaticFile(path.join(userDir,unescape(matchedMp3)),res);
+  } else if (op === 'content') {
     res.writeHead(200, { "Content-Type" : "text/plain" });  
     console.log(mp3Lists);
     console.log('trying to read user:' + user + ',mp3List=' + mp3Lists);
@@ -157,7 +155,6 @@ function singleUserOp(req,res,user,op){
     res.end();  
   } else if (op === "clear") {  
     res.writeHead(200, { "Content-Type" : "text/plain" });  
-    var userDir = path.join(USERDIR,matchedUser);
     fs.readdir(userDir, function(err,files){
         var deleteCount = files.length;
         jquery.map(files, function(file) {
@@ -190,13 +187,16 @@ function handleUpload(req,res,user){
   fields = [],
   currentFile;
 
+  console.log("1");
   form.uploadDir = UPLOADDIR;
   form.keepExtensions = true;
   form.on('field', function(field, value) {
+    console.log("2");
     p([field, value]);
     fields.push([field, value]);
     console.log("field...expected bytes:" + form.bytesExpected + "received:" + form.bytesReceived);
   }).on('file', function(field, file) {
+    console.log("3");
     p([field, file]);
     console.log(util.inspect(file));
     console.log(file.length);
@@ -221,6 +221,8 @@ function handleUpload(req,res,user){
         });
       });
   });
+  console.log('parsing req:' + req);
+  console.log(util.inspect(req));
   form.parse(req);
 }
 
@@ -240,17 +242,15 @@ function updateChecksum(user,files,callback){
 	  // console.log('checksums: old:' + mp3Lists[user].sha1 + ', new:' + res);
       console.log('checksums: new:' + res);
       mp3Lists[user]['sha1'] = res;
-      console.log(mp3Lists);
       callback();
     });
 }
 
 function updateMp3List(user,callback) {
   var userDir = path.join(USERDIR,user);
-  console.log(util.inspect(process.memoryUsage()));
+  // console.log(util.inspect(process.memoryUsage()));
   syncUtil.flatten(userDir, function(dirList) {
     rebuildMp3List(user, dirList);
-    console.log(mp3Lists);
     updateChecksum(user,dirList,callback);
   });
 }
