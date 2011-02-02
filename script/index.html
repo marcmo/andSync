@@ -191,7 +191,7 @@
           {
             listedMp3s[this.name] = true;
             var newItem = '<li id=' + this.name + 
-                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/' + currentUser + '/content/get/' +
+                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/user/get/' + currentUser + '/' + 
                   this.name  + '">' + this.name + '<\/a><\/li>';
             $("#sortable").append(newItem);
             $("#sortable").sortable('refresh');

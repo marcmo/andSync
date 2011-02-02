@@ -107,7 +107,7 @@ function handleUserOperation(req,res){
   } else if (getRegex.test(req.url)) {
     var matchedUser = getRegex.exec(req.url)[1];
     var matchedMp3 = getRegex.exec(req.url)[2];
-    var userDir = path.join(USERDIR,matchedUser);
+    var userDir = path.join('users',unescape(matchedUser));
     console.log("trying to fetch:" + matchedMp3 + " from " + matchedUser);
     serveStaticFile(path.join(userDir,unescape(matchedMp3)),res);
   } else if (req.url == '/user/new') {
