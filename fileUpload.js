@@ -86,15 +86,80 @@ function startServer(){
 }
 
 function handleUserOperation(req,res){
-    var userUploadRegex = /\/user\/upload\/(.*)/i;
-    if (userUploadRegex.test(req.url)) {
-      var matchedUser = userUploadRegex.exec(req.url)[1];
-      console.log("was an upload for:" + matchedUser);
-      handleUpload(req,res,matchedUser);
-    } else if (req.url == '/user/new') {
-    var form = new formidable.IncomingForm(),
-    fields = [];
-    form
+  var uploadRegex = /\/user\/upload\/(.*)/i;
+  var sha1Regex = /\/user\/sha1\/(.*)/i;
+  var contentRegex = /\/user\/content\/(.*)/i;
+  var clearRegex = /\/user\/clear\/(.*)/i;
+  var getRegex = /\/user\/get\/(.*)\/(.*\.\w*)/i;
+  if (uploadRegex.test(req.url)) {
+    var matchedUser = uploadRegex.exec(req.url)[1];
+    console.log("was an upload for:" + matchedUser);
+    handleUpload(req,res,matchedUser);
+  } else if (sha1Regex.test(req.url)) {
+    var matchedUser = sha1Regex.exec(req.url)[1];
+    userSha1(req,res,matchedUser);
+  } else if (contentRegex.test(req.url)) {
+    var matchedUser = contentRegex.exec(req.url)[1];
+    userContent(req,res,matchedUser);
+  } else if (clearRegex.test(req.url)) {
+    var matchedUser = clearRegex.exec(req.url)[1];
+    clearUserFiles(req,res,matchedUser);
+  } else if (getRegex.test(req.url)) {
+    var matchedUser = getRegex.exec(req.url)[1];
+    var matchedMp3 = getRegex.exec(req.url)[2];
+    var userDir = path.join(USERDIR,matchedUser);
+    console.log("trying to fetch:" + matchedMp3 + " from " + matchedUser);
+    serveStaticFile(path.join(userDir,unescape(matchedMp3)),res);
+  } else if (req.url == '/user/new') {
+    createNewUser(req,res);
+  } else if (req.url == '/user/list'){
+    res.writeHead(200, { "Content-Type" : "text/plain" });  
+    res.write(JSON.stringify(USERS));  
+    res.end();  
+  } else {
+    res.writeHead(404, {'content-type': 'text/plain'});
+    res.end('404');
+  }
+}
+
+function userContent(req,res,user){
+  res.writeHead(200, { "Content-Type" : "text/plain" });  
+  console.log(mp3Lists);
+  console.log('trying to read user:' + user + ',mp3List=' + mp3Lists);
+  res.write(JSON.stringify(mp3Lists[user].music));  
+  res.end();  
+}
+function userSha1(req,res,user){
+  console.log("sending back sha1:" + mp3Lists[user].sha1);
+  res.writeHead(200, { "Content-Type" : "text/plain" });  
+  res.write("" + mp3Lists[user].sha1);
+  res.end();  
+}
+function clearUserFiles(req,res,user){
+  res.writeHead(200, { "Content-Type" : "text/plain" });  
+  fs.readdir(userDir, function(err,files){
+      var deleteCount = files.length;
+      jquery.map(files, function(file) {
+          if (err) {throw err;}
+          fs.unlink(path.join(userDir,file), function (err) {
+              if (err) {throw err;}
+              console.log('successfully deleted ' + file + ', ' + deleteCount + ' to go...');
+              deleteCount--;
+              if (deleteCount === 0) {
+                updateMp3List(user,function(){
+                    res.write(JSON.stringify(mp3Lists[user].music));  
+                    res.end();
+                });
+              }
+          });
+      });
+  });
+}
+
+function createNewUser(req,res){
+  var form = new formidable.IncomingForm(),
+  fields = [];
+  form
     .on('error', function(err) {
       res.writeHead(200, {'content-type': 'text/plain'});
       res.end('error:\n\n'+util.inspect(err));
@@ -117,72 +182,7 @@ function handleUserOperation(req,res){
             console.log('done!'+x);
           }); // done callback
     });
-    form.parse(req);
-  } else if (req.url == '/user/list'){
-    res.writeHead(200, { "Content-Type" : "text/plain" });  
-    res.write(JSON.stringify(USERS));  
-    res.end();  
-  } else {
-    var userRegex = /\/user\/([\w\s\d]*)[\/]{0,1}(.*)/i;
-    console.log("user url was:" + req.url);
-    var matchedUser = userRegex.exec(req.url)[1];
-    var userDir = path.join(USERDIR,matchedUser);
-    path.exists(userDir, function (exists) {
-      console.log('user action:' + matchedUser);
-      if (exists){
-        var matchedOp = userRegex.exec(req.url)[2];
-        singleUserOp(req,res,matchedUser,matchedOp);
-      } else {
-        res.writeHead(404, {'content-type': 'text/plain'});
-        res.end('404');
-      }
-    });
-  }
-}
-
-function singleUserOp(req,res,user,op){
-  console.log("content url was:" + req.url + ',op:' + op);
-  var contentRegex = /\/content\/get\/(.*\.\w*)/i;
-  var userDir = path.join(USERDIR,user);
-  if (contentRegex.test(op)) {
-    var matchedMp3 = contentRegex.exec(op)[1];
-    serveStaticFile(path.join(userDir,unescape(matchedMp3)),res);
-  } else if (op === 'content') {
-    res.writeHead(200, { "Content-Type" : "text/plain" });  
-    console.log(mp3Lists);
-    console.log('trying to read user:' + user + ',mp3List=' + mp3Lists);
-    res.write(JSON.stringify(mp3Lists[user].music));  
-    res.end();  
-  } else if (op === "sha1") {  
-    console.log("sending back sha1:" + mp3Lists[user].sha1);
-    res.writeHead(200, { "Content-Type" : "text/plain" });  
-    res.write("" + mp3Lists[user].sha1);
-    res.end();  
-  } else if (op === "clear") {  
-    res.writeHead(200, { "Content-Type" : "text/plain" });  
-    fs.readdir(userDir, function(err,files){
-        var deleteCount = files.length;
-        jquery.map(files, function(file) {
-            if (err) {throw err;}
-            fs.unlink(path.join(userDir,file), function (err) {
-                if (err) {throw err;}
-                console.log('successfully deleted ' + file + ', ' + deleteCount + ' to go...');
-                deleteCount--;
-                if (deleteCount === 0) {
-                  updateMp3List(user,function(){
-                      res.write(JSON.stringify(mp3Lists[user].music));  
-                      res.end();
-                  });
-                }
-            });
-        });
-    });
-  } else if (op === 'upload') {
-    handleUpload(req,res,user);
-  } else {
-    res.writeHead(404, {'content-type': 'text/plain'});
-    res.end('404');
-  }
+  form.parse(req);
 }
 
 function handleUpload(req,res,user){

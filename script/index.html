@@ -147,17 +147,19 @@
   }
 
   var serverStateCheckSum = 0;
+  var updateCheckTimeoutActive = false;
+  var updateCheckTimeout;
   function getCurrentUsers() {
     $.getJSON("/user/list", function(users) {
     	  console.log(users);
         $.map(users, function(u) {
-          $("#selectableUsers").append('<li class="ui-widget-content"><a href="/user/' + u + '/content">' + u + '</a></li>');
+          $("#selectableUsers").append('<li class="ui-widget-content"><a href="/user/content/' + u + '">' + u + '</a></li>');
           });
     });
   }
   function checkForUpdated() {
     console.log("checking for updates...");
-    $.get("/user/" + currentUser + "/sha1", function(sha1) {
+    $.get("/user/sha1/" + currentUser, function(sha1) {
         var old = serverStateCheckSum;
         serverStateCheckSum = sha1;
         if (sha1 !== old) {
@@ -166,7 +168,12 @@
         }
         else {
           console.log("nothing changed... sha1:" + sha1);
-          setTimeout(checkForUpdated,5000);
+          if (updateCheckTimeoutActive){
+            updateCheckTimeoutActive = false;
+            clearTimeout(updateCheckTimeout);
+          }
+          updateCheckTimeoutActive = true;
+          updateCheckTimeout = setTimeout(checkForUpdated,5000);
         }
     });
   }
@@ -174,7 +181,7 @@
     function compareMp3s(a,b){
         return (a.name > b.name) ? 1 : -1;
     }
-    $.getJSON("/user/" + currentUser + "/content", function(mp3s) {
+    $.getJSON("/user/content/" + currentUser, function(mp3s) {
 
       console.log(mp3s);
 
@@ -191,7 +198,12 @@
           }
         });
       }
-      setTimeout(checkForUpdated,5000);
+      if (updateCheckTimeoutActive){
+        updateCheckTimeoutActive = false;
+        clearTimeout(updateCheckTimeout);
+      }
+      updateCheckTimeoutActive = true;
+      updateCheckTimeout = setTimeout(checkForUpdated,5000);
     });
   }
   setTimeout(getCurrentUsers, 2000);
