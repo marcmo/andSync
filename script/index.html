@@ -60,6 +60,10 @@
             var selectedUser = $( "#selectableUsers li:nth-child(" + (index+1) + ")" ).text();
             result.append( " #" + ( index + 1 ) + ' ' + selectedUser);
             currentUser = selectedUser;
+            var fs = document.forms;
+            console.log(fs[0].action);
+            $("#mp3uploadId").attr("action","/user/upload/" + currentUser);
+            console.log(fs[0].action);
             checkForUpdated();
           });
         }
@@ -91,6 +95,11 @@
         });
         return false;
       });
+      $("#selectsearch").change(function() {
+        var action = $(this).val() == "people" ? "user" : "content";
+        $("#search-form").attr("action", "/search/" + action);
+      });
+      
       
   });
   </script> 
@@ -207,9 +216,6 @@
     });
   }
   setTimeout(getCurrentUsers, 2000);
-  function createGetContentString(){
-  	return "/user/upload/"+currentUser;
-  }
   </script>
 </head>
 <body>
@@ -224,8 +230,8 @@
 </ol>
 </div><!-- End userlist -->
   
-<form class="upload" action="/user/upload/oli" method="POST" enctype="multipart/form-data">
-<!-- <form class="upload" action="createGetContentString()" method="POST" enctype="multipart/form-data"> -->
+<form class="upload" action="/user/upload/dan" method="POST" enctype="multipart/form-data" name="mp3upload" id="mp3uploadId">
+<!-- <form class="upload" action="" method="POST" enctype="multipart/form-data" name="mp3upload" id="mp3uploadId"> -->
     <input type="file" name="file" multiple>
     <button>Upload</button>
     <div>drag music files here</div>

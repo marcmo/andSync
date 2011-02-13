@@ -16,7 +16,26 @@
 
     var FileUpload,
         methods;
-        
+    function reinitSettings(container){
+        var uploadForm = (container.is('form') ? container : container.find('form').first()),
+            fileInput = uploadForm.find('input:file').first(),
+            settings = {
+                namespace: 'file_upload',
+                cssClass: 'file_upload',
+                dragDropSupport: true,
+                dropZone: container,
+                url: uploadForm.attr('action'),
+                method: uploadForm.attr('method'),
+                fieldName: fileInput.attr('name'),
+                multipart: true,
+                formData: function () {
+                    return uploadForm.serializeArray();
+                },
+                withCredentials: false,
+                forceIframeUpload: false
+            };
+        return settings;
+    }    
     FileUpload = function (container) {
         var fileUpload = this,
             uploadForm = (container.is('form') ? container : container.find('form').first()),
@@ -207,6 +226,8 @@
             },
 
             handleFile = function (event, files, index) {
+                var settingsNew = reinitSettings(container);
+                settings.url = settingsNew.url;
                 var xhr = new XMLHttpRequest(),
                     uploadSettings = $.extend({}, settings);
                 if (typeof settings.initUpload === func) {
