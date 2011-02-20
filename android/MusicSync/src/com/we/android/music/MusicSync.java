@@ -124,11 +124,6 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
     }
 
     @Override
-    public void onDownloadStarted(String file) {
-	mAdapter.showProgress(0);
-    }
-
-    @Override
     public void onProgressUpdate(int progress) {
 	mAdapter.showProgress(progress);    
     }
@@ -141,9 +136,5 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
     public void onFilesMissing(List<String> missingFiles) {
 	getListView().removeFooterView(mFooter);
 	mAdapter.refreshFolder(missingFiles);
-    }
-
-    @Override
-    public void onDownloadFinished(String file) {
     }
 }

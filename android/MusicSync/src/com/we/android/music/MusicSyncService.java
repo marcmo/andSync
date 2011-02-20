@@ -130,12 +130,6 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
 			HttpEntity entity = response.getEntity();
 			if (entity != null) {
-			    mHandler.post(new Runnable() {
-				@Override
-				public void run() {
-				    mMusicSyncListener.onDownloadStarted(task.mFile);
-				}
-			    });
 			    try {
 				FileOutputStream output = new FileOutputStream(new File(mlocalSyncFolder, task.mFile));
 				BufferedInputStream input = new BufferedInputStream(entity.getContent());
@@ -222,7 +216,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
     private JSONArray getSyncFolder(String url) {
 	HttpClient httpclient = new DefaultHttpClient();
 	HttpGet httpget = new HttpGet(url);
-	JSONArray files = null;
+	JSONArray files = new JSONArray();
 	try {
 	    HttpResponse response = httpclient.execute(httpget);
 	    Log.i(TAG,response.getStatusLine().toString());
