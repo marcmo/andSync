@@ -25,10 +25,11 @@ import org.json.JSONObject;
 
 import android.app.Service;
 import android.content.Intent;
+import android.media.MediaScannerConnection;
+import android.media.MediaScannerConnection.MediaScannerConnectionClient;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Binder;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
@@ -54,20 +55,29 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
     }
 
     private final LocalBinder mBinder = new LocalBinder();
-    private static final String TAG = "MusicSync";
-    private static final String HOST = "http://www.coldflake.com:8080";
-    private File mlocalSyncFolder;
+    public static final String TAG = "MusicSync";
     private IMusicSyncListener mMusicSyncListener;
     private Handler mHandler = new Handler();
     private Downloader mDownloader;
+    private MediaScannerConnection mScannerConnection;
+    private File mlocalSyncFolder;
+    private String mHost;
 
     @Override
     public void onCreate() {
-	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), TAG);
-	if (!mlocalSyncFolder.exists()) {
-	    mlocalSyncFolder.mkdir();
-	}
 	mDownloader = new Downloader();
+	mScannerConnection = new MediaScannerConnection(getApplicationContext(), new MediaScannerConnectionClient() {
+	    @Override
+	    public void onScanCompleted(String path, Uri uri) {
+		Log.d(TAG, "hossa");
+	    }
+	    
+	    @Override
+	    public void onMediaScannerConnected() {
+		Log.d(TAG, "hossa");
+	    }
+	});
+	mScannerConnection.connect();
     }
 
     private List<String> getFilesRelativeToFolder(File folder, List<File> files) {
@@ -106,9 +116,14 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
     class Downloader extends AsyncTask<DownloadTask, Integer, Void> {
 	@Override
 	protected Void doInBackground(DownloadTask... tasks) {
+	    List<String> missingFiles = new ArrayList<String>();
+	    for (DownloadTask task : tasks) {
+		missingFiles.add(task.mFile);
+	    }
+	    publishMissingFiles(missingFiles);
 	    HttpClient httpclient = new DefaultHttpClient();
 	    for (final DownloadTask task : tasks) {
-		String encoded = HOST + "/content/" + Uri.encode(task.mFile);
+		String encoded = mHost + "/user/get/gerd/" + Uri.encode(task.mFile);
 		HttpGet httpget = new HttpGet(encoded);
 		try {
 		    HttpResponse response = httpclient.execute(httpget);
@@ -116,16 +131,18 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 			HttpEntity entity = response.getEntity();
 			if (entity != null) {
 			    mHandler.post(new Runnable() {
-			        @Override
-			        public void run() {
-			            mMusicSyncListener.onDownloadStarted(task.mFile);
-			        }
+				@Override
+				public void run() {
+				    mMusicSyncListener.onDownloadStarted(task.mFile);
+				}
 			    });
 			    try {
 				FileOutputStream output = new FileOutputStream(new File(mlocalSyncFolder, task.mFile));
 				BufferedInputStream input = new BufferedInputStream(entity.getContent());
 				try {
 				    download(input, output, task.mSize);
+				    missingFiles.remove(task.mFile);
+				    publishMissingFiles(missingFiles);
 				} finally {
 				    output.close();
 				    input.close();
@@ -143,6 +160,15 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		}
 	    }
 	    return null;
+	}
+	
+	private void publishMissingFiles(final List<String> missingFiles) {
+	    mHandler.post(new Runnable() {
+	        @Override
+	        public void run() {
+	            mMusicSyncListener.onFilesMissing(missingFiles);
+	        }
+	    });
 	}
 
 	private void download(InputStream is, OutputStream os, int totalSize) throws IOException {
@@ -167,6 +193,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
 	@Override
 	protected void onPostExecute(Void result) {
+	    mScannerConnection.scanFile(mlocalSyncFolder.toString(), null);
 	    mMusicSyncListener.onSyncFinished();
 	}
     }
@@ -240,14 +267,16 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
     public void registerSyncListener(IMusicSyncListener listener) {
 	mMusicSyncListener = listener;
     }
-    
+
     @Override
-    public void start() {
+    public void syncFolder(File localFolder, String host, String user) {
+	mHost = host;
+	mlocalSyncFolder = localFolder;
 	List<String> allFilesRelativeToSync = getFilesRelativeToFolder(mlocalSyncFolder, flattenDir(mlocalSyncFolder));
 
-	JSONArray syncFolder = getSyncFolder(HOST + "/content");
+	JSONArray syncFolder = getSyncFolder(host + "/user/content/" + user);
 	List<DownloadTask> downloadTasks = findMissingFiles(allFilesRelativeToSync, syncFolder);
-
+	
 	DownloadTask[] tasks = downloadTasks.toArray(new DownloadTask[downloadTasks.size()]);
 	mDownloader.execute(tasks);
     }
