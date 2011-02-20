@@ -18,6 +18,7 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MusicSync extends ListActivity implements ServiceConnection, IMusicSyncListener {
     class SynFolderAdapter extends BaseAdapter {
@@ -130,6 +131,7 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 
     @Override
     public void onSyncFinished() {
+	Toast.makeText(getApplicationContext(), "Folder synced", Toast.LENGTH_SHORT).show();
     }
 
     @Override
