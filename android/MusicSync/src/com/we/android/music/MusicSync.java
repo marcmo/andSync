@@ -1,6 +1,5 @@
 package com.we.android.music;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,10 +8,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.IBinder;
+import android.provider.MediaStore;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -21,25 +21,29 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MusicSync extends ListActivity implements ServiceConnection, IMusicSyncListener {
-    class SynFolderAdapter extends BaseAdapter {
+    class SyncFolderAdapter extends BaseAdapter {
 	private static final int PROGRESS_UNDFINED = -1;
-	private File[] mLocalFileList;
 	private List<String> mMissingFiles = new ArrayList<String>();
 	private int mProgress = PROGRESS_UNDFINED;
+	private Cursor mLocalFilesCursor;
 
-	public SynFolderAdapter() {
-	    mLocalFileList = mlocalSyncFolder.listFiles();
-	}
-	
 	@Override
 	public int getCount() {
-	    return mLocalFileList.length + mMissingFiles.size();
+	    int count = 0;
+	    if (mLocalFilesCursor != null) {
+		count = mLocalFilesCursor.getCount(); 
+	    }
+	    return count + mMissingFiles.size();
 	}
 	
-	public void refreshFolder(List<String> missingFiles) {
-	    mLocalFileList = mlocalSyncFolder.listFiles();
+	public void addMissingFiles(List<String> missingFiles) {
 	    mMissingFiles.clear();
 	    mMissingFiles.addAll(missingFiles);
+	    notifyDataSetChanged();
+	}
+	
+	public void addLocalFiles(Cursor cursor) {
+	    mLocalFilesCursor = cursor;
 	    notifyDataSetChanged();
 	}
 	
@@ -60,64 +64,92 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 
 	@Override
 	public View getView(int position, View convertView, ViewGroup parent) {
+	    int localFilesCount = 0;
+	    if (mLocalFilesCursor != null) {
+		localFilesCount = mLocalFilesCursor.getCount();
+	    }
 	    View view = null;
-	    if (position < mLocalFileList.length) {
+	    if (position < localFilesCount) {
 		view = getLayoutInflater().inflate(R.layout.listitem, parent, false);
-		TextView text = (TextView) view.findViewById(R.id.text);
-		text.setText(mLocalFileList[position].getName());
-	    } else if (position == mLocalFileList.length) {
+		mLocalFilesCursor.moveToPosition(position);
+		TextView title = (TextView) view.findViewById(R.id.title);
+		title.setText(mLocalFilesCursor.getString(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE)));
+		TextView artist = (TextView) view.findViewById(R.id.artist);
+		artist.setText(mLocalFilesCursor.getString(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.ARTIST)));
+	    } else if (position == localFilesCount) {
 		view = getLayoutInflater().inflate(R.layout.downloadinglistitem, parent, false);
 		TextView text = (TextView) view.findViewById(R.id.text);
 		text.setTextColor(Color.DKGRAY);
-		text.setText(mMissingFiles.get(position - mLocalFileList.length));
+		text.setText(mMissingFiles.get(position - localFilesCount));
 		if (mProgress != PROGRESS_UNDFINED) {
 		    ProgressBar progressBar = (ProgressBar) view.findViewById(R.id.progressbar);
 		    progressBar.setProgress(mProgress);
 		    TextView percentage = (TextView) view.findViewById(R.id.percentage);
 		    percentage.setText(mProgress + "%");
 		}
-	    } else if (position > mLocalFileList.length) {
+	    } else if (position > localFilesCount) {
 		view = getLayoutInflater().inflate(R.layout.listitem, parent, false);
-		TextView text = (TextView) view.findViewById(R.id.text);
-		text.setText(mMissingFiles.get(position - mLocalFileList.length));
-		text.setTextColor(Color.DKGRAY);
+		TextView title = (TextView) view.findViewById(R.id.title);
+		title.setText(mMissingFiles.get(position - localFilesCount));
+		title.setTextColor(Color.DKGRAY);
 	    }
 	    return view;
 	}
     }
     
-    private static final String HOST = "http://www.coldflake.com:8080";
-    
     private IMusicSyncControl mMusicSyncControl;
-    private File mlocalSyncFolder;
     private View mFooter;
-    private SynFolderAdapter mAdapter;
+    private SyncFolderAdapter mAdapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
 	super.onCreate(savedInstanceState);
-	
-	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), MusicSyncService.TAG);
-	if (!mlocalSyncFolder.exists()) {
-	    mlocalSyncFolder.mkdir();
-	}
 
-	mFooter = getLayoutInflater().inflate(R.layout.footer, null);
-	getListView().setFooterDividersEnabled(false);
-	getListView().addFooterView(mFooter, null, false);
+//	mFooter = getLayoutInflater().inflate(R.layout.footer, null);
+//	getListView().setFooterDividersEnabled(false);
+//	getListView().addFooterView(mFooter, null, false);
 
-	mAdapter = new SynFolderAdapter();
-	setListAdapter(mAdapter);
+	mAdapter = new SyncFolderAdapter();
+	getListView().setAdapter(mAdapter);
 	
+//	sendBroadcast(new Intent(Intent.ACTION_MEDIA_MOUNTED, Uri.parse("file://"+ Environment.getExternalStorageDirectory())));
 	startService(new Intent(MusicSyncService.class.getName()));
+    }
+    
+    @Override
+    protected void onResume() {
 	bindService(new Intent(MusicSyncService.class.getName()), this, Context.BIND_AUTO_CREATE);
+        super.onResume();
+    }
+    
+    @Override
+    protected void onPause() {
+	mMusicSyncControl.unregisterSyncListener(this);
+	unbindService(this);
+        super.onPause();
+    }
+    
+    private Cursor getLocalFiles() {
+	String[] projection = new String[] {
+		android.provider.MediaStore.Audio.Media._ID,
+		android.provider.MediaStore.Audio.Media.ARTIST,
+		android.provider.MediaStore.Audio.Media.TITLE,
+		android.provider.MediaStore.Audio.Media.DATA,
+		android.provider.MediaStore.Audio.Media.DURATION
+	};
+	StringBuilder where = new StringBuilder();
+	where.append(android.provider.MediaStore.Audio.Media.DATA +" LIKE '/mnt/sdcard/musicsync%'");
+	Cursor cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+		projection,
+		where.toString(), null, null);
+	return cursor;
     }
 
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
 	mMusicSyncControl = ((MusicSyncService.LocalBinder) service).getService();
 	mMusicSyncControl.registerSyncListener(this);
-	mMusicSyncControl.syncFolder(mlocalSyncFolder, HOST, "gerd");
+	onFilesMissing(mMusicSyncControl.getMissingFiles());
     }
 
     @Override
@@ -137,6 +169,7 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
     @Override
     public void onFilesMissing(List<String> missingFiles) {
 	getListView().removeFooterView(mFooter);
-	mAdapter.refreshFolder(missingFiles);
+	mAdapter.addMissingFiles(missingFiles);
+	mAdapter.addLocalFiles(getLocalFiles());
     }
 }
