@@ -105,14 +105,15 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
     public void onCreate(Bundle savedInstanceState) {
 	super.onCreate(savedInstanceState);
 
-//	mFooter = getLayoutInflater().inflate(R.layout.footer, null);
-//	getListView().setFooterDividersEnabled(false);
-//	getListView().addFooterView(mFooter, null, false);
+	mFooter = getLayoutInflater().inflate(R.layout.footer, null);
+	getListView().setFooterDividersEnabled(false);
+	getListView().addFooterView(mFooter, null, false);
 
 	mAdapter = new SyncFolderAdapter();
 	getListView().setAdapter(mAdapter);
 	
-//	sendBroadcast(new Intent(Intent.ACTION_MEDIA_MOUNTED, Uri.parse("file://"+ Environment.getExternalStorageDirectory())));
+	mAdapter.addLocalFiles(getLocalFiles());
+	
 	startService(new Intent(MusicSyncService.class.getName()));
     }
     
