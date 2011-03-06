@@ -10,15 +10,18 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.MediaStore;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.AdapterView.OnItemClickListener;
 
 public class MusicSync extends ListActivity implements ServiceConnection, IMusicSyncListener {
     class SyncFolderAdapter extends BaseAdapter {
@@ -54,12 +57,14 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 
 	@Override
 	public Object getItem(int position) {
-	    return null;
+	    mLocalFilesCursor.moveToPosition(position);
+	    return mLocalFilesCursor.getString(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.DATA));
 	}
 
 	@Override
 	public long getItemId(int position) {
-	    return 0;
+	    mLocalFilesCursor.moveToPosition(position);
+	    return mLocalFilesCursor.getLong(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID));
 	}
 
 	@Override
@@ -113,6 +118,15 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 	getListView().setAdapter(mAdapter);
 	
 	mAdapter.addLocalFiles(getLocalFiles());
+	
+	getListView().setOnItemClickListener(new OnItemClickListener() {
+	    @Override
+	    public void onItemClick(AdapterView<?> parent, View view, int pos, long id) {
+		Intent i = new Intent(Intent.ACTION_VIEW);
+		i.setDataAndType(Uri.parse((String) mAdapter.getItem(pos)), "audio/*"); 
+		startActivity(i);
+	    }
+	});
 	
 	startService(new Intent(MusicSyncService.class.getName()));
     }
