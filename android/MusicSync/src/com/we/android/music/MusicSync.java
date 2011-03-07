@@ -5,12 +5,12 @@ import java.util.List;
 
 import android.app.ListActivity;
 import android.content.ComponentName;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.MediaStore;
@@ -32,13 +32,15 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 
 	@Override
 	public int getCount() {
-	    int count = 0;
-	    if (mLocalFilesCursor != null) {
-		count = mLocalFilesCursor.getCount(); 
-	    }
-	    return count + mMissingFiles.size();
+	    return getLocalFilesCount() + mMissingFiles.size();
 	}
 	
+	@Override
+	public Object getItem(int position) {
+	    // TODO Auto-generated method stub
+	    return null;
+	}
+
 	public void addMissingFiles(List<String> missingFiles) {
 	    mMissingFiles.clear();
 	    mMissingFiles.addAll(missingFiles);
@@ -56,23 +58,17 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 	}
 
 	@Override
-	public Object getItem(int position) {
-	    mLocalFilesCursor.moveToPosition(position);
-	    return mLocalFilesCursor.getString(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media.DATA));
-	}
-
-	@Override
 	public long getItemId(int position) {
-	    mLocalFilesCursor.moveToPosition(position);
-	    return mLocalFilesCursor.getLong(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID));
+	    if (position < getLocalFilesCount()) {
+		mLocalFilesCursor.moveToPosition(position);
+		return mLocalFilesCursor.getLong(mLocalFilesCursor.getColumnIndex(android.provider.MediaStore.Audio.Media._ID));
+	    }
+	    return -1;
 	}
 
 	@Override
 	public View getView(int position, View convertView, ViewGroup parent) {
-	    int localFilesCount = 0;
-	    if (mLocalFilesCursor != null) {
-		localFilesCount = mLocalFilesCursor.getCount();
-	    }
+	    int localFilesCount = getLocalFilesCount();
 	    View view = null;
 	    if (position < localFilesCount) {
 		view = getLayoutInflater().inflate(R.layout.listitem, parent, false);
@@ -100,8 +96,16 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 	    }
 	    return view;
 	}
+	
+	private int getLocalFilesCount() {
+	    int localFilesCount = 0;
+	    if (mLocalFilesCursor != null) {
+		localFilesCount = mLocalFilesCursor.getCount();
+	    }
+	    return localFilesCount;
+	}
     }
-    
+
     private IMusicSyncControl mMusicSyncControl;
     private View mFooter;
     private SyncFolderAdapter mAdapter;
@@ -121,10 +125,10 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 	
 	getListView().setOnItemClickListener(new OnItemClickListener() {
 	    @Override
-	    public void onItemClick(AdapterView<?> parent, View view, int pos, long id) {
-		Intent i = new Intent(Intent.ACTION_VIEW);
-		i.setDataAndType(Uri.parse((String) mAdapter.getItem(pos)), "audio/*"); 
-		startActivity(i);
+	    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+		Intent intent = new Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id));
+		intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+		startActivity(intent);
 	    }
 	});
 	
