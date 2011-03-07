@@ -54,6 +54,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    Sync sync = syncs[0];
 	    int completeFiles = 0;
 	    for (final SyncTask task : sync.getSyncTasks()) {
+		showSyncDownloadNotification(task.mFile);
 		String encoded = Constants.HOST + "/user/get/gerd/" + Uri.encode(task.mFile);
 		HttpGet httpget = new HttpGet(encoded);
 		try {
@@ -159,6 +160,14 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
 	public List<SyncTask> getSyncTasks() {
 	    return mTasks;
+	}
+	
+	public long getTotalDownloadSize() {
+	    long size = 0;
+	    for (SyncTask task : mTasks) {
+		size += task.mSize;
+	    }
+	    return size;
 	}
     }
 
@@ -365,24 +374,30 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
     }
 
     private void showSyncStartedNotification() {
-	Intent intent = new Intent(this, MusicSync.class);
-	intent.setAction(Intent.ACTION_VIEW);
-	Notification notification = new Notification(R.drawable.icon, "Syncing...", System.currentTimeMillis());
-	notification.flags |= Notification.FLAG_NO_CLEAR;
+	Notification notification = createNotification("Syncing Music Files");
 	notification.flags |= Notification.FLAG_ONGOING_EVENT;
-	notification.setLatestEventInfo(this, "MusicSync", "Syncing Music Files", 
-		PendingIntent.getActivity(this.getBaseContext(), 0, intent, PendingIntent.FLAG_CANCEL_CURRENT));
 	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
     }
     
     private void showSyncFinishedNotification() {
+	Notification notification = createNotification("All Music Files synced");
+	notification.flags |= Notification.FLAG_AUTO_CANCEL;
+	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
+    }
+    
+    private void showSyncDownloadNotification(String fileName) {
+	Notification notification = createNotification("downloading " + fileName);
+	notification.flags |= Notification.FLAG_ONGOING_EVENT;
+	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
+    }
+    
+    private Notification createNotification(String message) {
 	Intent intent = new Intent(this, MusicSync.class);
 	intent.setAction(Intent.ACTION_VIEW);
 	Notification notification = new Notification(R.drawable.icon, "Syncing...", System.currentTimeMillis());
 	notification.flags |= Notification.FLAG_NO_CLEAR;
-	notification.flags |= Notification.FLAG_AUTO_CANCEL;
-	notification.setLatestEventInfo(this, "MusicSync", "All Music Files synced", 
+	notification.setLatestEventInfo(this, "MusicSync", message, 
 		PendingIntent.getActivity(this.getBaseContext(), 0, intent, PendingIntent.FLAG_CANCEL_CURRENT));
-	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
+	return notification;
     }
 }
