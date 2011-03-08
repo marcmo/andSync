@@ -40,14 +40,14 @@ import android.util.Log;
 public class MusicSyncService extends Service implements IMusicSyncControl {
 
     private class AsyncDownloader extends AsyncTask<Sync, Integer, Void> {
-	
+
 	@Override
 	protected void onPreExecute() {
 	    mIsSyncing = true;
 	    showSyncStartedNotification();
 	    super.onPreExecute();
 	}
-	
+
 	@Override
 	protected Void doInBackground(Sync... syncs) {
 	    HttpClient httpclient = new DefaultHttpClient();
@@ -99,16 +99,39 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
 	private void updateMissingFiles(SyncTask task, File file) {
 	    mMissingFiles.remove(task.mFile);
-	    MediaScannerConnection.scanFile(getApplicationContext(), new String[]{file.toString()}, null, new MediaScannerConnectionClient() {
-		@Override
-		public void onScanCompleted(String path, Uri uri) {
-		    publishMissingFiles(mMissingFiles);
-		}
+	    doMediaScan(file);
+	}
+	
+	class MyMediaScannerConnectionClient implements MediaScannerConnectionClient {
+	    private MediaScannerConnection mConnection;
+	    private File mFile;
 
-		@Override
-		public void onMediaScannerConnected() {
-		}
-	    });
+	    public MyMediaScannerConnectionClient(File file) {
+		mFile = file;
+	    }
+	    
+	    @Override
+	    public void onMediaScannerConnected() {
+		mConnection.scanFile(mFile.toString(), null);
+	    }
+
+	    @Override
+	    public void onScanCompleted(String path, Uri uri) {
+		publishMissingFiles(mMissingFiles);
+	    }
+
+	    public void setMediaScannerConnection(MediaScannerConnection mediaScannerConnection) {
+		mConnection = mediaScannerConnection;
+	    }
+
+	}
+
+	private void doMediaScan(File file) {
+	    MyMediaScannerConnectionClient connectionClient = new MyMediaScannerConnectionClient(file);
+	    MediaScannerConnection mediaScannerConnection = 
+		new MediaScannerConnection(getApplicationContext(), connectionClient);
+	    connectionClient.setMediaScannerConnection(mediaScannerConnection);
+	    mediaScannerConnection.connect();
 	}
 
 	private void download(InputStream is, OutputStream os, int totalSize) throws IOException {
@@ -161,7 +184,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	public List<SyncTask> getSyncTasks() {
 	    return mTasks;
 	}
-	
+
 	public long getTotalDownloadSize() {
 	    long size = 0;
 	    for (SyncTask task : mTasks) {
@@ -259,13 +282,13 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    List<String> allFilesRelativeToSync = getFilesRelativeToFolder(mlocalSyncFolder, Util.flattenDir(mlocalSyncFolder));
 	    JSONArray syncFolder = getSyncFolder(Constants.HOST + "/user/content/" + Constants.USER);
 	    List<SyncTask> tasks = findMissingFiles(allFilesRelativeToSync, syncFolder);
-	    
+
 	    if (tasks.size() > 0) {
 		mMissingFiles.clear();
 		for (SyncTask task : tasks) {
 		    mMissingFiles.add(task.mFile);
 		}
-		
+
 		Sync sync = new Sync(sha1, tasks);
 		mDownloader = new AsyncDownloader();
 		mDownloader.execute(sync);
@@ -378,19 +401,19 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	notification.flags |= Notification.FLAG_ONGOING_EVENT;
 	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
     }
-    
+
     private void showSyncFinishedNotification() {
 	Notification notification = createNotification("All Music Files synced");
 	notification.flags |= Notification.FLAG_AUTO_CANCEL;
 	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
     }
-    
+
     private void showSyncDownloadNotification(String fileName) {
 	Notification notification = createNotification("downloading " + fileName);
 	notification.flags |= Notification.FLAG_ONGOING_EVENT;
 	mNotificationManager.notify(MUSIC_SYNC_NOTIFICATION, notification);
     }
-    
+
     private Notification createNotification(String message) {
 	Intent intent = new Intent(this, MusicSync.class);
 	intent.setAction(Intent.ACTION_VIEW);
