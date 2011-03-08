@@ -1,5 +1,6 @@
 package com.we.android.music;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,6 +13,7 @@ import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
 import android.provider.MediaStore;
 import android.view.View;
@@ -156,8 +158,11 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 		android.provider.MediaStore.Audio.Media.DATA,
 		android.provider.MediaStore.Audio.Media.DURATION
 	};
+	File externalStorageDirectory = Environment.getExternalStorageDirectory();
+	File syncFolder = new File(externalStorageDirectory, "musicsync");
+	
 	StringBuilder where = new StringBuilder();
-	where.append(android.provider.MediaStore.Audio.Media.DATA +" LIKE '/mnt/sdcard/musicsync%'");
+	where.append(android.provider.MediaStore.Audio.Media.DATA +" LIKE '" + syncFolder.getAbsolutePath() + "%'");
 	Cursor cursor = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
 		projection,
 		where.toString(), null, null);
