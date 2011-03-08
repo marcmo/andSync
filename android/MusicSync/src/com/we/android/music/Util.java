@@ -25,7 +25,7 @@ public class Util {
 	    res.add(file);
 	}
     }
-    
+
     public static String convertStreamToString(InputStream is) {
 	BufferedReader reader = new BufferedReader(new InputStreamReader(is));
 	StringBuilder sb = new StringBuilder();
