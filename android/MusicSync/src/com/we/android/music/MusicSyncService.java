@@ -57,6 +57,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		showSyncDownloadNotification(task.mFile);
 		String encoded = Constants.HOST + "/user/get/gerd/" + Uri.encode(task.mFile);
 		HttpGet httpget = new HttpGet(encoded);
+		httpget.setHeader("bytes", task.mDownloadedSize + "-");
 		try {
 		    HttpResponse response = httpclient.execute(httpget);
 		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
@@ -83,7 +84,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	private void downloadEntity(HttpEntity entity, SyncTask task) {
 	    try {
 		File file = new File(mlocalSyncFolder, task.mFile);
-		FileOutputStream output = new FileOutputStream(file);
+		FileOutputStream output = new FileOutputStream(file, true);
 		BufferedInputStream input = new BufferedInputStream(entity.getContent());
 		try {
 		    download(input, output, task.mSize);
@@ -134,7 +135,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    mediaScannerConnection.connect();
 	}
 
-	private void download(InputStream is, OutputStream os, int totalSize) throws IOException {
+	private void download(InputStream is, OutputStream os, long totalSize) throws IOException {
 	    byte[] buffer = new byte[5000];
 	    int counter = 0;
 	    int bytesRead = is.read(buffer);
@@ -196,10 +197,10 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
     private class SyncTask {
 	String mFile;
-	int mSize;
-	int mDownloadedSize;
+	long mSize;
+	long mDownloadedSize;
 
-	public SyncTask(String uri, int totalSize, int downloadedSize) {
+	public SyncTask(String uri, long totalSize, long downloadedSize) {
 	    mFile = uri;
 	    mSize = totalSize;
 	    mDownloadedSize = downloadedSize;
@@ -325,12 +326,18 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	try {
 	    for(int i=0; i<syncFolder.length();i++) {
 		JSONObject fileInfo = syncFolder.getJSONObject(i);
-		String file = fileInfo.getString("name");
+		String fileName = fileInfo.getString("name");
 		int size = fileInfo.getInt("size");
-		if (!set.contains(file)) {
-		    missingFiles.add(new SyncTask(file, size, 0));
+		if (!set.contains(fileName)) {
+		    missingFiles.add(new SyncTask(fileName, size, 0));
+		} else {
+		    File file = new File(fileName);
+		    long localFileSize = file.length();
+		    if (localFileSize != size) {
+			missingFiles.add(new SyncTask(fileName, size, localFileSize));
+		    }
 		}
-		Log.d(TAG, "remote file: " + file + " size: " + size);
+		Log.d(TAG, "remote file: " + fileName + " size: " + size);
 	    } 
 	} catch (JSONException e) {
 	    e.printStackTrace();
