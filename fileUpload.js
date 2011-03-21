@@ -94,6 +94,17 @@ function serveStaticFile(uri, req, res) {
   });  
 }
 
+function deleteSingleFile(user, uri, req, res) {
+		fs.unlink(uri, function (err) {
+				if (err) {throw err;}
+				console.log('successfully deleted ' + uri);
+				updateMp3List(user,function(){
+						res.write(JSON.stringify(mp3Lists[user].music));  
+						res.end();
+				});
+		});
+}
+
 function startServer(){
   var server = http.createServer(function(req, res) {
     console.log("server: req:" + req.url);
@@ -118,6 +129,7 @@ function handleUserOperation(req,res){
   var contentRegex = /\/user\/content\/(.*)/i;
   var clearRegex = /\/user\/clear\/(.*)/i;
   var getRegex = /\/user\/get\/(.*)\/(.*\.\w*)/i;
+  var deleteRegex = /\/user\/delete\/(.*)\/(.*\.\w*)/i;
   if (uploadRegex.test(req.url)) {
     var matchedUser = uploadRegex.exec(req.url)[1];
     console.log("was an upload for:" + matchedUser);
@@ -137,6 +149,12 @@ function handleUserOperation(req,res){
     var userDir = path.join('users',unescape(matchedUser));
     console.log("trying to fetch:" + matchedMp3 + " from " + matchedUser);
     serveStaticFile(path.join(userDir,unescape(matchedMp3)),req,res);
+  } else if (deleteRegex.test(req.url)) {
+    var matchedUser = deleteRegex.exec(req.url)[1];
+    var matchedMp3 = deleteRegex.exec(req.url)[2];
+    var userDir = path.join('users',unescape(matchedUser));
+    console.log("trying to delete:" + matchedMp3 + " from " + matchedUser);
+    deleteSingleFile(matchedUser,path.join(userDir,unescape(matchedMp3)),req,res);
   } else if (req.url == '/user/new') {
     createNewUser(req,res);
   } else if (req.url == '/user/list'){

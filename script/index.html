@@ -112,6 +112,11 @@
         console.log(mp3s);
       });
   }
+  function deleteSingleFile(user, file) {
+    $.getJSON("/user/delete/" + user + "/" + file, function(mp3s) {
+        console.log(mp3s);
+      });
+  }
   function getUsers() {
     $.getJSON("/users", function(users) {
         console.log(users);
@@ -199,9 +204,11 @@
           if (!listedMp3s[this.name])
           {
             listedMp3s[this.name] = true;
-            var newItem = '<li id=' + this.name + 
-                  ' class="ui-state-default"><span class="ui-icon ui-icon-volume-on"><\/span><a href="/user/get/' + currentUser + '/' + 
-                  this.name  + '">' + this.name + '<\/a><\/li>';
+            var newItem = "<li id=" + this.name + " class='ui-state-default'>" +
+              "<div style='float:left' class='ui-icon ui-icon-volume-on'\/>" +
+              "<div style='float:left'><a href='/user/get/" + currentUser + "/" + this.name  + "'>" + this.name + "<\/a></div>" +
+              "<div style='float:right'><a class='ui-icon ui-icon-trash'" +
+              " href=\"javascript:deleteSingleFile('" + currentUser + "','" + this.name + "')\"><\/a></div><\/li>";
             $("#sortable").append(newItem);
             $("#sortable").sortable('refresh');
           }
