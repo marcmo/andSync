@@ -43,7 +43,8 @@ syncUtil.ensureDirectory(UPLOADDIR, function() {
   });
 });
 
-function serveStaticFile(uri, res) {
+function serveStaticFile(uri, req, res) {
+  var range = req.headers.range;
   var filename = path.join(process.cwd(), uri);
   path.exists(filename, function(exists) {
     if(!exists) {
@@ -53,27 +54,53 @@ function serveStaticFile(uri, res) {
       res.end();  
       return;  
     } 
-    fs.readFile(filename, "binary", function(err, file) {  
-      if(err) {  
-        console.log("error...did not exist");
-        res.writeHead(500, {"Content-Type": "text/plain"});  
-        res.write(err + "\n");  
-        res.end();  
-        return;  
-      }  
-      res.writeHead(200);  
-      res.write(file, "binary");  
-      res.end();  
-    });  
+    var fileStat = fs.statSync(filename);
+    if (range){
+      console.log("serving static file, was partial get with: " + range);
+      var total = fileStat.size; 
+      var parts = range.replace(/bytes=/, "").split("-"); 
+      var partStart = parseInt(parts[0], 10); 
+      var partEnd = parts[1] ? parseInt(parts[1], 10) : total-1; 
+      var chunksize = partEnd-partStart; 
+      console.log("start:" + partStart + ",end"+partEnd+" (total: "+total+")");
+      res.writeHead(206, {
+        "Content-Range": "bytes " + partStart + "-" + partEnd + "/" + total,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunksize
+      }); 
+      fs.createReadStream(filename,{'start' : partStart, 'end' : partEnd, 'flags': 'r',
+																		'encoding': 'binary', 'mode': 0666, 'bufferSize': 4 * 1024})
+        .addListener("data", function(chunk){
+        	console.log("data chunk...");
+          res.write(chunk, 'binary');
+        })
+        .addListener("close",function() {
+        	console.log("close of read stream...");
+          res.end();
+        }); 
+    } else {
+			res.writeHead(200);  
+      fs.createReadStream(filename,{'flags': 'r',
+																		'encoding': 'binary', 'mode': 0666, 'bufferSize': 4 * 1024})
+        .addListener("data", function(chunk){
+        	console.log("data chunk...");
+          res.write(chunk, 'binary');
+        })
+        .addListener("close",function() {
+        	console.log("close of read stream...");
+          res.end();
+        }); 
+    }
   });  
 }
 
 function startServer(){
   var server = http.createServer(function(req, res) {
     console.log("server: req:" + req.url);
+    console.log("server: req.header" + util.inspect(req.headers));
     if (req.url.match("^\/script")) {
       var uri = url.parse(req.url).pathname;  
-      serveStaticFile(uri,res);
+      serveStaticFile(uri,req,res);
     } else if (req.url.match("^\/user\/")) {
       handleUserOperation(req,res);
     } else {
@@ -109,7 +136,7 @@ function handleUserOperation(req,res){
     var matchedMp3 = getRegex.exec(req.url)[2];
     var userDir = path.join('users',unescape(matchedUser));
     console.log("trying to fetch:" + matchedMp3 + " from " + matchedUser);
-    serveStaticFile(path.join(userDir,unescape(matchedMp3)),res);
+    serveStaticFile(path.join(userDir,unescape(matchedMp3)),req,res);
   } else if (req.url == '/user/new') {
     createNewUser(req,res);
   } else if (req.url == '/user/list'){
