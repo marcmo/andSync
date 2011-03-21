@@ -12,9 +12,7 @@ var fs = require('fs'),
     cryptoHelper = require("cryptoHelper"),
     asyncUtil = require("asyncUtil"),
     log4js = require('log4js')(),
-    logger = log4js.getLogger();
-
-logger.setLevel('WARN');
+    logger = log4js.getLogger("and");
 
 global.puts = futil.puts;
 global.p = function() {
