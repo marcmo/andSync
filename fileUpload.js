@@ -95,14 +95,23 @@ function serveStaticFile(uri, req, res) {
 }
 
 function deleteSingleFile(user, uri, req, res) {
-		fs.unlink(uri, function (err) {
-				if (err) {throw err;}
-				console.log('successfully deleted ' + uri);
-				updateMp3List(user,function(){
-						res.write(JSON.stringify(mp3Lists[user].music));  
-						res.end();
-				});
-		});
+    path.exists(uri, function(exists) {
+      if(!exists) {
+        console.log(uri + " did not exist");
+        res.writeHead(404, {"Content-Type": "text/plain"});  
+        res.write("404 Not Found\n");  
+        res.end();  
+        return;  
+      } 
+      fs.unlink(uri, function (err) {
+          if (err) {throw err;}
+          console.log('successfully deleted ' + uri);
+          updateMp3List(user,function(){
+              res.write(JSON.stringify(mp3Lists[user].music));  
+              res.end();
+          });
+      });
+    });
 }
 
 function startServer(){
