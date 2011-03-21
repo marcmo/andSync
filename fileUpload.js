@@ -95,29 +95,33 @@ function serveStaticFile(uri, req, res) {
 }
 
 function deleteSingleFile(user, uri, req, res) {
-    path.exists(uri, function(exists) {
-      if(!exists) {
-        console.log(uri + " did not exist");
-        res.writeHead(404, {"Content-Type": "text/plain"});  
-        res.write("404 Not Found\n");  
-        res.end();  
-        return;  
-      } 
-      fs.unlink(uri, function (err) {
-          if (err) {throw err;}
-          console.log('successfully deleted ' + uri);
-          updateMp3List(user,function(){
-              res.write(JSON.stringify(mp3Lists[user].music));  
-              res.end();
-          });
+    if (mp3Lists[user]){
+      path.exists(uri, function(exists) {
+        if(!exists) {
+          console.log(uri + " did not exist");
+          res.write(JSON.stringify(mp3Lists[user].music));  
+          res.end();  
+          return;  
+        } 
+        fs.unlink(uri, function (err) {
+            if (err) {throw err;}
+            console.log('successfully deleted ' + uri);
+            updateMp3List(user,function(){
+                res.write(JSON.stringify(mp3Lists[user].music));  
+                res.end();
+            });
+        });
       });
-    });
+    } else {
+      console.log("user " + user + " did not exist");
+      res.write(JSON.stringify({}));  
+    }
 }
 
 function startServer(){
   var server = http.createServer(function(req, res) {
     console.log("server: req:" + req.url);
-    console.log("server: req.header" + util.inspect(req.headers));
+    // console.log("server: req.header" + util.inspect(req.headers));
     if (req.url.match("^\/script")) {
       var uri = url.parse(req.url).pathname;  
       serveStaticFile(uri,req,res);
@@ -178,18 +182,24 @@ function handleUserOperation(req,res){
 
 function userContent(req,res,user){
   res.writeHead(200, { "Content-Type" : "text/plain" });  
-  console.log(mp3Lists);
-  console.log('trying to read user:' + user + ',mp3List=' + mp3Lists);
-  res.write(JSON.stringify(mp3Lists[user].music));  
+  if (mp3Lists[user]){
+    console.log(mp3Lists);
+    console.log('trying to read user:' + user + ',mp3List=' + mp3Lists);
+    res.write(JSON.stringify(mp3Lists[user].music));  
+  } else {
+    console.log("user " + user + " did not exist");
+    res.write(JSON.stringify({}));  
+  }
   res.end();  
 }
 function userSha1(req,res,user){
+  res.writeHead(200, { "Content-Type" : "text/plain" });  
   if (mp3Lists[user]){
     console.log("sending back sha1:" + mp3Lists[user].sha1);
-    res.writeHead(200, { "Content-Type" : "text/plain" });  
     res.write("" + mp3Lists[user].sha1);
   } else {
     console.log("user " + user + " did not exist");
+    res.write(JSON.stringify({}));  
   }
   res.end();  
 }
