@@ -184,9 +184,13 @@ function userContent(req,res,user){
   res.end();  
 }
 function userSha1(req,res,user){
-  console.log("sending back sha1:" + mp3Lists[user].sha1);
-  res.writeHead(200, { "Content-Type" : "text/plain" });  
-  res.write("" + mp3Lists[user].sha1);
+  if (mp3Lists[user]){
+    console.log("sending back sha1:" + mp3Lists[user].sha1);
+    res.writeHead(200, { "Content-Type" : "text/plain" });  
+    res.write("" + mp3Lists[user].sha1);
+  } else {
+    console.log("user " + user + " did not exist");
+  }
   res.end();  
 }
 function clearUserFiles(req,res,user){
