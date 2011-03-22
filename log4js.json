@@ -3,26 +3,17 @@
     { 
       "category": "and", 
       "type": "file", 
-      "filename": "log4js.log", 
-      "maxLogSize": 4096,
-      "backups": 3,
-      "pollInterval": 15
+      "filename": "log4js.log"
     },
     { 
       "category": "asyncUtil", 
       "type": "file", 
-      "filename": "log4js.log", 
-      "maxLogSize": 4096,
-      "backups": 3,
-      "pollInterval": 15
+      "filename": "log4js_util.log"
     },
     { 
       "category": "crypto", 
       "type": "file", 
-      "filename": "log4js.log", 
-      "maxLogSize": 4096,
-      "backups": 3,
-      "pollInterval": 15
+      "filename": "log4js_crypto.log"
     }
   ],
   
