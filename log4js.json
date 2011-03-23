@@ -1,0 +1,35 @@
+{
+  "appenders": [
+    { 
+      "category": "and", 
+      "type": "file", 
+      "filename": "log4js.log", 
+      "maxLogSize": 4096,
+      "backups": 3,
+      "pollInterval": 15
+    },
+    { 
+      "category": "asyncUtil", 
+      "type": "file", 
+      "filename": "log4js.log", 
+      "maxLogSize": 4096,
+      "backups": 3,
+      "pollInterval": 15
+    },
+    { 
+      "category": "crypto", 
+      "type": "file", 
+      "filename": "log4js.log", 
+      "maxLogSize": 4096,
+      "backups": 3,
+      "pollInterval": 15
+    }
+  ],
+  
+  "levels": {
+    "and":  "DEBUG",
+    "asyncUtil":  "DEBUG",
+    "crypto":  "DEBUG"
+  }
+}
+
