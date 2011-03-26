@@ -7,8 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.http.HttpEntity;
@@ -35,6 +36,7 @@ import android.os.Binder;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.provider.MediaStore;
 import android.util.Log;
 
 public class MusicSyncService extends Service implements IMusicSyncControl {
@@ -57,7 +59,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		showSyncDownloadNotification(task.mFile);
 		String encoded = Constants.HOST + "/user/get/gerd/" + Uri.encode(task.mFile);
 		HttpGet httpget = new HttpGet(encoded);
-		httpget.setHeader("bytes", task.mDownloadedSize + "-");
+		httpget.setHeader("bytes", task.mDownloadedSize + "-" + task.mSize);
 		try {
 		    HttpResponse response = httpclient.execute(httpget);
 		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
@@ -87,7 +89,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		FileOutputStream output = new FileOutputStream(file, true);
 		BufferedInputStream input = new BufferedInputStream(entity.getContent());
 		try {
-		    download(input, output, task.mSize);
+		    download(input, output, task.mDownloadedSize, task.mSize);
 		    updateMissingFiles(task, file);
 		} finally {
 		    output.close();
@@ -102,7 +104,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    mMissingFiles.remove(task.mFile);
 	    doMediaScan(file);
 	}
-	
+
 	class MyMediaScannerConnectionClient implements MediaScannerConnectionClient {
 	    private MediaScannerConnection mConnection;
 	    private File mFile;
@@ -110,7 +112,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    public MyMediaScannerConnectionClient(File file) {
 		mFile = file;
 	    }
-	    
+
 	    @Override
 	    public void onMediaScannerConnected() {
 		mConnection.scanFile(mFile.toString(), null);
@@ -124,7 +126,6 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    public void setMediaScannerConnection(MediaScannerConnection mediaScannerConnection) {
 		mConnection = mediaScannerConnection;
 	    }
-
 	}
 
 	private void doMediaScan(File file) {
@@ -135,12 +136,13 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    mediaScannerConnection.connect();
 	}
 
-	private void download(InputStream is, OutputStream os, long totalSize) throws IOException {
+	private void download(InputStream is, OutputStream os, long downloadedSize, long totalSize) throws IOException {
 	    byte[] buffer = new byte[5000];
-	    int counter = 0;
+	    long counter = downloadedSize;
 	    int bytesRead = is.read(buffer);
 	    while (!isCancelled() && (bytesRead != -1)) {
 		counter += bytesRead;
+		//		if (counter > 1000000) break;
 		int percentPerFile = (int) ((counter / (float) totalSize) * 100);
 		publishProgress(percentPerFile);
 		os.write(buffer, 0, bytesRead);
@@ -280,21 +282,59 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	}
 
 	if (!mIsSyncing) {
-	    List<String> allFilesRelativeToSync = getFilesRelativeToFolder(mlocalSyncFolder, Util.flattenDir(mlocalSyncFolder));
-	    JSONArray syncFolder = getSyncFolder(Constants.HOST + "/user/content/" + Constants.USER);
-	    List<SyncTask> tasks = findMissingFiles(allFilesRelativeToSync, syncFolder);
+	    Map<String, Long> localFiles = createLocalFileMap(getFilesRelativeToFolder(mlocalSyncFolder, Util.flattenDir(mlocalSyncFolder)));
+	    Map<String, Long> remoteFiles = createRemoteFilesMap(getSyncFolder(Constants.HOST + "/user/content/" + Constants.USER));
+	    List<String> listOfFilesToDelete = findMissingRemoteFiles(localFiles, remoteFiles);
+	    if (listOfFilesToDelete.size() > 0) {
+		deleteFiles(listOfFilesToDelete);
+	    }
 
+	    List<SyncTask> tasks = findMissingLocalFiles(localFiles, remoteFiles);
 	    if (tasks.size() > 0) {
 		mMissingFiles.clear();
 		for (SyncTask task : tasks) {
 		    mMissingFiles.add(task.mFile);
 		}
-
 		Sync sync = new Sync(sha1, tasks);
 		mDownloader = new AsyncDownloader();
 		mDownloader.execute(sync);
 	    }
 	}
+    }
+
+    private void deleteFiles(List<String> files) {
+	for (String file : files) {
+	    File fileToDelete = new File(mlocalSyncFolder, file);
+	    fileToDelete.delete();
+	    StringBuilder where = new StringBuilder();
+	    where.append(android.provider.MediaStore.Audio.Media.DATA +" LIKE '" + fileToDelete.getAbsolutePath() + "%'");
+	    getContentResolver().delete(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, where.toString(), null);
+	}
+    }
+
+    private Map<String, Long> createRemoteFilesMap(JSONArray syncFolder) {
+	Map<String, Long> map = new HashMap<String, Long>();
+	for(int i=0; i<syncFolder.length();i++) {
+	    JSONObject fileInfo;
+	    try {
+		fileInfo = syncFolder.getJSONObject(i);
+		String fileName = fileInfo.getString("name");
+		long size = fileInfo.getInt("size");
+		map.put(fileName, size);
+	    } catch (JSONException e) {
+		e.printStackTrace();
+	    }
+	}
+	return map;
+    }
+
+    private Map<String, Long> createLocalFileMap(List<String> localFiles) {
+	Map<String, Long> map = new HashMap<String, Long>();
+	for (String fileName : localFiles) {
+	    File file = new File(mlocalSyncFolder, fileName);
+	    map.put(fileName, file.length());
+	}
+	return map;
     }
 
     @Override
@@ -317,32 +357,32 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	return relativeToSync;
     }
 
-    private List<SyncTask> findMissingFiles(List<String> localFiles, JSONArray syncFolder) {
-	Set<String> set = new HashSet<String>();
-	for (String file : localFiles) {
-	    set.add(file);
-	}
-	List<SyncTask> missingFiles = new ArrayList<SyncTask>();
-	try {
-	    for(int i=0; i<syncFolder.length();i++) {
-		JSONObject fileInfo = syncFolder.getJSONObject(i);
-		String fileName = fileInfo.getString("name");
-		int size = fileInfo.getInt("size");
-		if (!set.contains(fileName)) {
-		    missingFiles.add(new SyncTask(fileName, size, 0));
-		} else {
-		    File file = new File(fileName);
-		    long localFileSize = file.length();
-		    if (localFileSize != size) {
-			missingFiles.add(new SyncTask(fileName, size, localFileSize));
-		    }
+    private List<SyncTask> findMissingLocalFiles(Map<String, Long> localFiles, Map<String, Long> remoteFiles) {
+	List<SyncTask> tasks = new ArrayList<SyncTask>();
+	Set<String> files = remoteFiles.keySet();
+	for (String file : files) {
+	    long remoteSize = remoteFiles.get(file);
+	    if (localFiles.containsKey(file)) {
+		long localSize = localFiles.get(file);
+		if (remoteSize != localSize) {
+		    tasks.add(new SyncTask(file, remoteSize, localSize));
 		}
-		Log.d(TAG, "remote file: " + fileName + " size: " + size);
-	    } 
-	} catch (JSONException e) {
-	    e.printStackTrace();
+	    } else {
+		tasks.add(new SyncTask(file, remoteSize, 0));
+	    }
 	}
-	return missingFiles;
+	return tasks;
+    }
+
+    private List<String> findMissingRemoteFiles(Map<String, Long> localFiles, Map<String, Long> remoteFiles) {
+	List<String> missingRemoteFiles = new ArrayList<String>();
+	Set<String> files = localFiles.keySet();
+	for (String file : files) {
+	    if (!remoteFiles.containsKey(file)) {
+		missingRemoteFiles.add(file);
+	    }
+	}
+	return missingRemoteFiles;
     }
 
     private JSONArray getSyncFolder(String url) {
