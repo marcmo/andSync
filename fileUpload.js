@@ -169,7 +169,7 @@ function handleUserOperation(req,res){
   } else if (eraseUserRegex.test(req.url)) {
     var matchedUser = eraseUserRegex.exec(req.url)[1];
     var userDir = path.join('users',unescape(matchedUser));
-    eraseUser(req,res,userDir,matchedUser);
+    eraseUser(req,res,userDir,unescape(matchedUser));
   } else if (deleteFileRegex.test(req.url)) {
     var matchedUser = deleteFileRegex.exec(req.url)[1];
     var matchedMp3 = deleteFileRegex.exec(req.url)[2];
@@ -195,7 +195,7 @@ function userContent(req,res,user){
     logger.debug('trying to read user:' + user + ',mp3List=' + mp3Lists);
     res.write(JSON.stringify(mp3Lists[user].music));  
   } else {
-    logger.warn("usercontent, user " + user + " did not exist");
+    logger.debug("usercontent, user " + user + " did not exist");
     res.write(JSON.stringify({}));  
   }
   res.end();  
@@ -205,10 +205,12 @@ function eraseUser(req,res,userDir,user){
   if (mp3Lists[user]){
     delete mp3Lists[user];
   }
-  logger.debug("users before: " + util.inspect(USERS));
+  logger.debug("user to delete:" + user + ",users before: " + util.inspect(USERS));
   var i = USERS.lastIndexOf(user);
   if (i !== -1){
     USERS.splice(i,1);
+  } else {
+    logger.warn("user not found:" + user);
   }
   logger.debug("users after: " + util.inspect(USERS));
   clearUserFiles(userDir,user,function(){
