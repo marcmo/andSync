@@ -20,6 +20,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
+import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -117,8 +118,10 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 	super.onCreate(savedInstanceState);
 
 	mFooter = getLayoutInflater().inflate(R.layout.footer, null);
-	getListView().setFooterDividersEnabled(false);
-	getListView().addFooterView(mFooter, null, false);
+	ListView listView = getListView();
+	listView.setFooterDividersEnabled(false);
+	listView.addFooterView(mFooter, null, false);
+	listView.setEmptyView(getLayoutInflater().inflate(R.layout.empty, null));
 
 	mAdapter = new SyncFolderAdapter();
 	getListView().setAdapter(mAdapter);
