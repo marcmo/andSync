@@ -59,10 +59,13 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		showSyncDownloadNotification(task.mFile);
 		String encoded = Constants.HOST + "/user/get/gerd/" + Uri.encode(task.mFile);
 		HttpGet httpget = new HttpGet(encoded);
-		httpget.setHeader("bytes", task.mDownloadedSize + "-" + task.mSize);
+		if (task.mDownloadedSize > 0) {
+		    httpget.setHeader("Range", "bytes=" + task.mDownloadedSize + "-");
+		}
 		try {
 		    HttpResponse response = httpclient.execute(httpget);
-		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+		    int statusCode = response.getStatusLine().getStatusCode();
+		    if ((statusCode == HttpStatus.SC_OK) || (statusCode == HttpStatus.SC_PARTIAL_CONTENT)) {
 			HttpEntity entity = response.getEntity();
 			if (entity != null) {
 			    downloadEntity(entity, task);
@@ -245,7 +248,8 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		HttpGet httpget = new HttpGet(encoded);
 		try {
 		    HttpResponse response = httpclient.execute(httpget);
-		    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+		    int statusCode = response.getStatusLine().getStatusCode();
+		    if (statusCode == HttpStatus.SC_OK) {
 			HttpEntity entity = response.getEntity();
 			String sha1 = Util.convertStreamToString(entity.getContent());
 			if (!sha1.equals(mSha1)) {
