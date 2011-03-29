@@ -60,7 +60,7 @@ function serveStaticFile(uri, req, res) {
       var parts = range.replace(/bytes=/, "").split("-"); 
       var partStart = parseInt(parts[0], 10); 
       var partEnd = parts[1] ? parseInt(parts[1], 10) : total-1; 
-      var chunksize = partEnd-partStart; 
+      var chunksize = partEnd-partStart+1; 
       logger.debug("start:" + partStart + ",end"+partEnd+" (total: "+total+")");
       res.writeHead(206, {
         "Content-Range": "bytes " + partStart + "-" + partEnd + "/" + total,
