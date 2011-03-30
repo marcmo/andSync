@@ -281,16 +281,19 @@ function createNewUser(req,res){
       asyncUtil.asyncMap(newFolders,
           function(x,cb){fs.mkdir(x,0777,cb);}, // partial function application
           function(x){
-            puts('-> post done');
             res.writeHead(200, {'content-type': 'text/plain'});
             res.end('received fields:\n\n '+util.inspect(fields));
             logger.debug('done!'+x);
+            jquery.map(fields, function(user){
+              rebuildMp3List(user,[]);
+            });
           }); // done callback
     });
   form.parse(req);
 }
 
 function handleUpload(req,res,user){
+	// logger.debug("handleUpload,req:"+util.inspect(req));
   var form = new formidable.IncomingForm(),
   files = [],
   fields = [],
@@ -299,31 +302,39 @@ function handleUpload(req,res,user){
   form.uploadDir = UPLOADDIR;
   form.keepExtensions = true;
 
-  form.on('field', function(field, value) {
-    p([field, value]);
-    fields.push([field, value]);
+	form
+    .on('error', function(err) {
+			logger.debug("error on upload:" + err);
+      res.writeHead(200, {'content-type': 'text/plain'});
+      res.end('error:\n\n'+util.inspect(err));
+	}).on('field', function(field, value) {
+			p([field, value]);
+			fields.push([field, value]);
   }).on('file', function(field, file) {
-    p([field, file]);
-    files.push([field, file]);
-    currentFile = file;
+			p([field, file]);
+			files.push([field, file]);
+			currentFile = file;
   }).on('end', function() {
-    puts('-> upload done');
-    res.writeHead(200, {'content-type': 'text/plain'});
-    var responseObject = [];
-    jquery.map(files, function(f){
-      responseObject.push({name:f[1].filename,size:f[1].length});
-    });
-    logger.debug("copy from to:" + currentFile.path + " to -> " +  path.join(path.join(USERDIR,user),currentFile.filename));
-    fs.rename(currentFile.path,
-      path.join(path.join(USERDIR,user),currentFile.filename),
-      function(){
-        updateMp3List(user,function(){
-            res.write(JSON.stringify(responseObject));
-            res.end();
-        });
-      }
-      );
-  });
+			puts('-> upload done');
+			res.writeHead(200, {'content-type': 'text/plain'});
+			var responseObject = [];
+			jquery.map(files, function(f){
+				responseObject.push({name:f[1].filename,size:f[1].length});
+			});
+			if (!currentFile){
+				return;
+			}
+			logger.debug("copy from to:" + currentFile.path + " to -> " +  path.join(path.join(USERDIR,user),currentFile.filename));
+			fs.rename(currentFile.path,
+				path.join(path.join(USERDIR,user),currentFile.filename),
+				function(){
+					updateMp3List(user,function(){
+							res.write(JSON.stringify(responseObject));
+							res.end();
+					});
+				}
+				);
+	});
   form.parse(req);
 }
 
