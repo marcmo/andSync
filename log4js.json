@@ -6,6 +6,10 @@
       "filename": "log4js.log"
     },
     { 
+      "category": "and", 
+      "type": "console"
+    },
+    { 
       "category": "asyncUtil", 
       "type": "file", 
       "filename": "log4js_util.log"
