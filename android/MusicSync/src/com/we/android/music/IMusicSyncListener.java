@@ -6,4 +6,5 @@ public interface IMusicSyncListener {
     public void onFilesMissing(List<String> missingFiles);
     public void onProgressUpdate(int progress);
     public void onSyncFinished();
+    public void onFilesDeletet();
 }

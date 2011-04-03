@@ -46,8 +46,9 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
 	@Override
 	protected void onPreExecute() {
-	    showSyncStartedNotification();
 	    super.onPreExecute();
+	    showSyncStartedNotification();
+	    publishMissingFiles(mMissingFiles);
 	}
 
 	@Override
@@ -242,6 +243,10 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	@Override
 	public void onFilesMissing(List<String> missingFiles) {
 	}
+
+	@Override
+	public void onFilesDeletet() {
+	}
     };
 
     public void checkSha1() {
@@ -302,6 +307,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	List<String> listOfFilesToDelete = findMissingRemoteFiles(localFiles, remoteFiles);
 	if (listOfFilesToDelete.size() > 0) {
 	    deleteFiles(listOfFilesToDelete);
+	    publishFilesDeleted();
 	}
 
 	List<SyncTask> tasks = findMissingLocalFiles(localFiles, remoteFiles);
@@ -439,6 +445,10 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		mMusicSyncListener.onFilesMissing(missingFiles);
 	    }
 	});
+    }
+    
+    private void publishFilesDeleted() {
+	mMusicSyncListener.onFilesDeletet();
     }
 
     @Override

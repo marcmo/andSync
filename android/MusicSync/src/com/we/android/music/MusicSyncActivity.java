@@ -146,7 +146,7 @@ public class MusicSyncActivity extends ListActivity implements ServiceConnection
 	AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
 	Intent intent = new Intent(this, MusicSyncService.class);
 	PendingIntent pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-//	alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME, 0, AlarmManager.INTERVAL_FIFTEEN_MINUTES, pendingIntent);
+//	alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME, 0, AlarmManager.INTERVAL_HALF_HOUR, pendingIntent);
 	alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME, 0, 1000 * 60, pendingIntent);
 
 	bindService(new Intent(MusicSyncService.class.getName()), this, Context.BIND_AUTO_CREATE);
@@ -203,6 +203,11 @@ public class MusicSyncActivity extends ListActivity implements ServiceConnection
     public void onFilesMissing(List<String> missingFiles) {
 	getListView().removeFooterView(mFooter);
 	mAdapter.addMissingFiles(missingFiles);
+	mAdapter.addLocalFiles(getLocalFiles());
+    }
+
+    @Override
+    public void onFilesDeletet() {
 	mAdapter.addLocalFiles(getLocalFiles());
     }
 }
