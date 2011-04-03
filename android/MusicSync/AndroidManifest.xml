@@ -7,7 +7,7 @@
     	android:icon="@drawable/icon" 
     	android:label="@string/app_name" 
     	android:debuggable="true">
-        <activity android:name=".MusicSync"
+        <activity android:name="MusicSyncActivity"
                   android:label="@string/app_name"
                   android:launchMode="singleTask">
             <intent-filter>
@@ -20,6 +20,11 @@
         		<action android:name="com.we.android.music.MusicSyncService"/>
         	</intent-filter>
         </service>
+        <receiver android:name ="com.we.android.MusicSyncAutoStarter">
+           <intent-filter>
+            	<action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
     </application>
 	<uses-permission android:name="android.permission.INTERNET"></uses-permission>
 	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"></uses-permission>

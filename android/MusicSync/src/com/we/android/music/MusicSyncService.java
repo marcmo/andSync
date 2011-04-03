@@ -36,6 +36,7 @@ import android.os.Binder;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Process;
 import android.provider.MediaStore;
 import android.util.Log;
 
@@ -45,7 +46,6 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
 	@Override
 	protected void onPreExecute() {
-	    mIsSyncing = true;
 	    showSyncStartedNotification();
 	    super.onPreExecute();
 	}
@@ -68,8 +68,9 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 		    if ((statusCode == HttpStatus.SC_OK) || (statusCode == HttpStatus.SC_PARTIAL_CONTENT)) {
 			HttpEntity entity = response.getEntity();
 			if (entity != null) {
-			    downloadEntity(entity, task);
-			    completeFiles++;
+			    if (downloadEntity(entity, task)) {
+				completeFiles++;
+			    }
 			}
 			if (isCancelled()) break;
 		    } else {
@@ -86,14 +87,17 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    return null;
 	}
 
-	private void downloadEntity(HttpEntity entity, SyncTask task) {
+	private boolean downloadEntity(HttpEntity entity, SyncTask task) {
+	    boolean sucess = false;
 	    try {
 		File file = new File(mlocalSyncFolder, task.mFile);
 		FileOutputStream output = new FileOutputStream(file, true);
 		BufferedInputStream input = new BufferedInputStream(entity.getContent());
 		try {
-		    download(input, output, task.mDownloadedSize, task.mSize);
-		    updateMissingFiles(task, file);
+		    if (download(input, output, task.mDownloadedSize, task.mSize)) {
+			updateMissingFiles(task, file);
+			sucess = true;
+		    }
 		} finally {
 		    output.close();
 		    input.close();
@@ -101,6 +105,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    } catch (Exception e) {
 		Log.e(TAG, e.toString());
 	    }
+	    return sucess;
 	}
 
 	private void updateMissingFiles(SyncTask task, File file) {
@@ -139,13 +144,12 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    mediaScannerConnection.connect();
 	}
 
-	private void download(InputStream is, OutputStream os, long downloadedSize, long totalSize) throws IOException {
-	    byte[] buffer = new byte[5000];
+	private boolean download(InputStream is, OutputStream os, long downloadedSize, long totalSize) throws IOException {
+	    byte[] buffer = new byte[16*1024];
 	    long counter = downloadedSize;
 	    int bytesRead = is.read(buffer);
 	    while (!isCancelled() && (bytesRead != -1)) {
 		counter += bytesRead;
-		//		if (counter > 1000000) break;
 		int percentPerFile = (int) ((counter / (float) totalSize) * 100);
 		publishProgress(percentPerFile);
 		os.write(buffer, 0, bytesRead);
@@ -153,6 +157,8 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    }
 	    is.close();
 	    os.close();
+
+	    return counter == totalSize;
 	}
 
 	@Override
@@ -162,9 +168,9 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
 	@Override
 	protected void onPostExecute(Void result) {
-	    mIsSyncing = false;
 	    mMusicSyncListener.onSyncFinished();
 	    showSyncFinishedNotification();
+	    stopService();
 	}
     }
 
@@ -214,15 +220,14 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 
     private final LocalBinder mBinder = new LocalBinder();
     public static final String TAG = "MusicSync";
-    private Handler mHandler = new Handler();
     private AsyncDownloader mDownloader;
+    private Handler mHandler = new Handler();
     private File mlocalSyncFolder;
     private List<String> mMissingFiles = new ArrayList<String>();
-    private boolean mIsSyncing;
-    private static final long CYCLIC_CHECK = 60 * 1000;
     private String mSha1 = "undefined";
     private NotificationManager mNotificationManager;
     private static final int MUSIC_SYNC_NOTIFICATION = 0;
+    private boolean mIsRunning;
 
     private IMusicSyncListener mMusicSyncListener = NULL_SYNC_LISTENER;
     private static final IMusicSyncListener NULL_SYNC_LISTENER = new IMusicSyncListener() {
@@ -239,71 +244,78 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	}
     };
 
-    private Runnable mSHA1Checker = new Runnable() {
-	@Override
-	public void run() {
-	    if (!mIsSyncing) {
-		HttpClient httpclient = new DefaultHttpClient();
-		String encoded = Constants.HOST + "/user/sha1/" + Constants.USER;
-		HttpGet httpget = new HttpGet(encoded);
-		try {
-		    HttpResponse response = httpclient.execute(httpget);
-		    int statusCode = response.getStatusLine().getStatusCode();
-		    if (statusCode == HttpStatus.SC_OK) {
-			HttpEntity entity = response.getEntity();
-			String sha1 = Util.convertStreamToString(entity.getContent());
-			if (!sha1.equals(mSha1)) {
-			    doSync(sha1);
-			}
-		    } else {
-			Log.i(TAG, "sha1 check failed: " + response.getStatusLine().toString());
-		    }
-		} catch(Exception e) {
-		    Log.i(TAG,"HttpRequest not successful" + e.toString());
+    public void checkSha1() {
+	boolean asyncStop = false;
+	HttpClient httpclient = new DefaultHttpClient();
+	String encoded = Constants.HOST + "/user/sha1/" + Constants.USER;
+	HttpGet httpget = new HttpGet(encoded);
+	try {
+	    HttpResponse response = httpclient.execute(httpget);
+	    int statusCode = response.getStatusLine().getStatusCode();
+	    if (statusCode == HttpStatus.SC_OK) {
+		HttpEntity entity = response.getEntity();
+		String sha1 = Util.convertStreamToString(entity.getContent());
+		if (!sha1.equals(mSha1)) {
+		    asyncStop = doSync(sha1);
 		}
-		httpclient.getConnectionManager().shutdown();
+	    } else {
+		Log.i(TAG, "sha1 check failed: " + response.getStatusLine().toString());
 	    }
-	    mHandler.postDelayed(mSHA1Checker, CYCLIC_CHECK);
+	} catch(Exception e) {
+	    Log.i(TAG,"HttpRequest not successful" + e.toString());
 	}
-    };
+	httpclient.getConnectionManager().shutdown();
+	if (!asyncStop) {
+	    stopService();
+	}
+    }
 
 
     public void onCreate() {
-	mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 	super.onCreate();
+	Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+	mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
     }
 
     @Override
     public void onStart(Intent intent, int startId) {
-	mHandler.post(mSHA1Checker);
 	super.onStart(intent, startId);
+	if (!mIsRunning) {
+	    mIsRunning = true;
+	    checkSha1();
+	}
     }
-
-    private void doSync(String sha1) {
-	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), Constants.SYNC_FOLDER);
+    
+    private void stopService() {
+	mIsRunning = false;
+	stopSelf();
+    }
+    
+    private boolean doSync(String sha1) {
+	mlocalSyncFolder = new File(Environment.getExternalStorageDirectory(), Constants.LOCAL_SYNC_FOLDER);
 	if (!mlocalSyncFolder.exists()) {
 	    mlocalSyncFolder.mkdir();
 	}
 
-	if (!mIsSyncing) {
-	    Map<String, Long> localFiles = createLocalFileMap(getFilesRelativeToFolder(mlocalSyncFolder, Util.flattenDir(mlocalSyncFolder)));
-	    Map<String, Long> remoteFiles = createRemoteFilesMap(getSyncFolder(Constants.HOST + "/user/content/" + Constants.USER));
-	    List<String> listOfFilesToDelete = findMissingRemoteFiles(localFiles, remoteFiles);
-	    if (listOfFilesToDelete.size() > 0) {
-		deleteFiles(listOfFilesToDelete);
-	    }
-
-	    List<SyncTask> tasks = findMissingLocalFiles(localFiles, remoteFiles);
-	    if (tasks.size() > 0) {
-		mMissingFiles.clear();
-		for (SyncTask task : tasks) {
-		    mMissingFiles.add(task.mFile);
-		}
-		Sync sync = new Sync(sha1, tasks);
-		mDownloader = new AsyncDownloader();
-		mDownloader.execute(sync);
-	    }
+	Map<String, Long> localFiles = createLocalFileMap(getFilesRelativeToFolder(mlocalSyncFolder, Util.flattenDir(mlocalSyncFolder)));
+	Map<String, Long> remoteFiles = createRemoteFilesMap(getSyncFolder(Constants.HOST + Constants.SYNC_PATH + Constants.USER));
+	List<String> listOfFilesToDelete = findMissingRemoteFiles(localFiles, remoteFiles);
+	if (listOfFilesToDelete.size() > 0) {
+	    deleteFiles(listOfFilesToDelete);
 	}
+
+	List<SyncTask> tasks = findMissingLocalFiles(localFiles, remoteFiles);
+	if (tasks.size() > 0) {
+	    mMissingFiles.clear();
+	    for (SyncTask task : tasks) {
+		mMissingFiles.add(task.mFile);
+	    }
+	    Sync sync = new Sync(sha1, tasks);
+	    mDownloader = new AsyncDownloader();
+	    mDownloader.execute(sync);
+	    return true;
+	}
+	return false;
     }
 
     private void deleteFiles(List<String> files) {
@@ -341,12 +353,6 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	return map;
     }
 
-    @Override
-    public void onDestroy() {
-	mHandler.removeCallbacks(mSHA1Checker);
-	super.onDestroy();
-    }
-
     private List<String> getFilesRelativeToFolder(File folder, List<File> files) {
 	// remove leading "/"
 	int posPrefix = folder.getAbsolutePath().length() + 1;
@@ -368,7 +374,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
 	    long remoteSize = remoteFiles.get(file);
 	    if (localFiles.containsKey(file)) {
 		long localSize = localFiles.get(file);
-		if (remoteSize != localSize) {
+		if (localSize < remoteSize) {
 		    tasks.add(new SyncTask(file, remoteSize, localSize));
 		}
 	    } else {
@@ -466,7 +472,7 @@ public class MusicSyncService extends Service implements IMusicSyncControl {
     }
 
     private Notification createNotification(String message) {
-	Intent intent = new Intent(this, MusicSync.class);
+	Intent intent = new Intent(this, MusicSyncActivity.class);
 	intent.setAction(Intent.ACTION_VIEW);
 	Notification notification = new Notification(R.drawable.icon, "Syncing...", System.currentTimeMillis());
 	notification.flags |= Notification.FLAG_NO_CLEAR;

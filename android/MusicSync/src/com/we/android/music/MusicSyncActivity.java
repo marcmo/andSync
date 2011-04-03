@@ -4,7 +4,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.app.AlarmManager;
 import android.app.ListActivity;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.ContentUris;
 import android.content.Context;
@@ -26,7 +28,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.OnItemClickListener;
 
-public class MusicSync extends ListActivity implements ServiceConnection, IMusicSyncListener {
+public class MusicSyncActivity extends ListActivity implements ServiceConnection, IMusicSyncListener {
     class SyncFolderAdapter extends BaseAdapter {
 	private static final int PROGRESS_UNDFINED = -1;
 	private List<String> mMissingFiles = new ArrayList<String>();
@@ -136,14 +138,18 @@ public class MusicSync extends ListActivity implements ServiceConnection, IMusic
 		startActivity(intent);
 	    }
 	});
-	
-	startService(new Intent(MusicSyncService.class.getName()));
     }
     
     @Override
     protected void onResume() {
+	super.onResume();
+	AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+	Intent intent = new Intent(this, MusicSyncService.class);
+	PendingIntent pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+//	alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME, 0, AlarmManager.INTERVAL_FIFTEEN_MINUTES, pendingIntent);
+	alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME, 0, 1000 * 60, pendingIntent);
+
 	bindService(new Intent(MusicSyncService.class.getName()), this, Context.BIND_AUTO_CREATE);
-        super.onResume();
     }
     
     @Override
