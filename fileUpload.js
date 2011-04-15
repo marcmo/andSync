@@ -314,6 +314,11 @@ function handleUpload(req,res,user){
 			p([field, file]);
 			files.push([field, file]);
 			currentFile = file;
+  }).on('progress', function(received, expected) {
+      var progress = (received / expected * 100).toFixed(2);
+      var mb = (expected / 1024 / 1024).toFixed(1);
+      logger.debug("received/expected:" + received + " - " + expected);
+      logger.debug("Uploading "+mb+"mb ("+progress+"%)\015");
   }).on('end', function() {
 			puts('-> upload done');
 			res.writeHead(200, {'content-type': 'text/plain'});

@@ -71,9 +71,9 @@ instance J.JSON MusicItem where
     Item <$> f "name" <*> f "modified" <*> f "size"      
       where f x = mLookup x jsonObjAssoc >>= J.readJSON
             jsonObjAssoc = J.fromJSObject obj
-
-
+            
 mLookup a as = maybe (fail $ "No such element: " ++ a) return (lookup a as)
+
 createAndDeleteUserContent :: IO ()
 createAndDeleteUserContent = do
     let user = "testUserXYZ123"
@@ -101,16 +101,11 @@ uploadFileUri u = fromJust $ serverUri $ "/user/upload/" ++ (urlEncode u)
 userContentUri u = fromJust $ serverUri $ "/user/content/" ++ (urlEncode u)
 deleteFileFromUserUri u f = fromJust $ serverUri $ "/user/delete/" ++ (urlEncode u) ++ "/" ++ (urlEncode f)
 
--- /user/new => create new user with form, field should contain user name
--- /user/list => list all existing user, return user as JSON object
 -- for specific users:
--- /user/upload/$USER => start upload-streaming for $USER
 -- /user/sha1/$USER   => get sha1 checksum for $USER
--- /user/content/$USER => get all files of $USER, returns stringified
 -- list of user files
 -- /user/clear/$USER => delete all files of $USER
 -- /user/get/$USER/$FILE => start download of $FILE from $USER
--- /user/delete/$USER/$FILE => delete $FILE from $USER
 
 getUsers ::  IO (J.Result [String])
 getUsers = do 
