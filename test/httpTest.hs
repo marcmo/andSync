@@ -1,27 +1,33 @@
 import Upload(uploadFile)
+import Download(downloadFile)
 import Network.HTTP
 import Network.Browser
 import Network.URI(parseURI,URI)
 import qualified Text.JSON as J
 import qualified Text.JSON.String as J
 import qualified Data.Set as S
+import Data.List(sort,nub)
 import Maybe(fromJust)
-import Control.Monad(forM_)
+import Data.Either(rights)
+import Control.Monad(forM_,forM)
 import Control.Applicative((<$>),(<*>))
 import Control.Exception(bracket,finally)
 import Directory(getCurrentDirectory)
+import qualified Data.ByteString as BS
 
 import Test.Framework (defaultMain, testGroup)
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import Test.QuickCheck
-import Test.QuickCheck.Monadic(monadicIO,run,assert)
+import Test.QuickCheck.Monadic
 import qualified Test.HUnit as T
 
 main = do
     createAndDeleteUserContent
+    uploadAndThenDownload
     q 10 $ label "prop_createAndDeleteUsers" prop_createAndDeleteUsers
+    q 10 $ label "prop_partialDownload" prop_partialDownload
     -- defaultMain tests
       where
         q n = quickCheckWith $ stdArgs { maxSuccess = n }
@@ -56,6 +62,29 @@ prop_createAndDeleteUsers users = monadicIO $ do
     (J.Ok eventualUsers) <- run $ getUsers >>= return . (fmap S.fromList)
     assert $ (eventualUsers S.\\ initialUsers) == S.empty
 
+prop_partialDownload = monadicIO $ do
+  let user = "testUserXYZ123"
+  path <- run $ getCurrentDirectory
+  let file = "/goldenSample.txt"
+  fileContent <- run $ readFile $ path ++ file
+  let endPos = length fileContent - 1
+  s <- pick $ listOf $ choose (0,endPos) :: PropertyM IO [Int]
+  let pairs = mkPairs $ nub $ sort $ [0,endPos] ++ s
+  res <- run $ downloadParts user pairs path file
+  assert $ (fileContent == res)
+
+mkPairs :: [Int] -> [(Int,Int)]
+mkPairs xs = go xs 0 []
+  where go [] _ r = reverse r
+        go (x:xs) i r = go xs (x+1) ((i,x):r)
+
+downloadParts user xs path file =
+    bracket (createUser user) (\_->eraseOneUser user) $ \_->do
+            uploadFile (uploadFileUri user) (path ++ file)
+            results <- forM xs $ \range->
+              downloadFile range (downloadFileFromUserUri user file)
+            return $ concat (rights results)
+
 data MusicItem = Item { 
 	            itemName :: String,
 	            modified :: String,
@@ -77,8 +106,7 @@ mLookup a as = maybe (fail $ "No such element: " ++ a) return (lookup a as)
 createAndDeleteUserContent :: IO ()
 createAndDeleteUserContent = do
     let user = "testUserXYZ123"
-    bracket (createUser user) (\_->eraseOneUser user)
-      (\_->do
+    bracket (createUser user) (\_->eraseOneUser user) $ \_->do
             path <- getCurrentDirectory
             let file = "/goldenSample.txt"
             contentA <- getUserContent user
@@ -86,11 +114,21 @@ createAndDeleteUserContent = do
             contentB <- getUserContent user
             deleteFromUser user file
             contentC <- getUserContent user
-            putStrLn $ show contentA
-            putStrLn $ show contentB
-            putStrLn $ show contentC
             T.assertEqual "content before and after should be the same" contentA contentC
-       )     
+            
+uploadAndThenDownload :: IO ()
+uploadAndThenDownload = do
+    let user = "testUserXYZ123"
+    bracket (createUser user) (\_->eraseOneUser user) $ \_->do
+            path <- getCurrentDirectory
+            let file = "/goldenSample.txt"
+            fileContent <- readFile $ path ++ file
+            uploadFile (uploadFileUri user) (path ++ file)
+            let range = (0,length fileContent - 1)
+            Right res <- downloadFile range (downloadFileFromUserUri user file)
+            deleteFromUser user file
+            let equal = fileContent == res
+            T.assertEqual "upload/download content should be the same" fileContent res
     
   
 serverUri x = parseURI $ "http://localhost:8080" ++ x
@@ -98,8 +136,10 @@ newUserUri = fromJust $ serverUri "/user/new"
 listUsersUri = fromJust $ serverUri "/user/list"
 eraseUserUri u = fromJust $ serverUri $ "/user/erase/" ++ (urlEncode u)
 uploadFileUri u = fromJust $ serverUri $ "/user/upload/" ++ (urlEncode u)
+downloadFileFromUserUri u f = fromJust $ serverUri $ "/user/get/" ++ (urlEncode u) ++ "/" ++ (urlEncode f)
 userContentUri u = fromJust $ serverUri $ "/user/content/" ++ (urlEncode u)
 deleteFileFromUserUri u f = fromJust $ serverUri $ "/user/delete/" ++ (urlEncode u) ++ "/" ++ (urlEncode f)
+
 
 -- for specific users:
 -- /user/sha1/$USER   => get sha1 checksum for $USER
