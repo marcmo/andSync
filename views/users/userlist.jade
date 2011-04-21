@@ -1,0 +1,9 @@
+h1= title
+p
+  a(class='button', href='/users/new') + New User
+
+ul
+  - for (var u in users)
+    li
+      a(class='button', href='/users/' + users[u].name + '/edit') #{users[u].name} (#{users[u].email})
+
