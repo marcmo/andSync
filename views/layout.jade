@@ -3,4 +3,14 @@ html
   head
     title= 'AndSync'
     link(rel='stylesheet', href='/stylesheets/style.css')
-  body!= body
+  body
+    #main
+      #header
+        - if (session.usermail)
+          #user= 'logged in as ' + session.usermail
+          #logout
+            a(href='/sessions/destroy') logout
+      - if (flash.warn)
+        p#warn= flash.warn
+      #container!= body
+

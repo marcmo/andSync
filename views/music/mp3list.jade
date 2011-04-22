@@ -1,0 +1,9 @@
+
+h1= title
+
+a(class='button', href='/users/') view users
+ul
+  - for (var u in mp3s)
+    li
+      a(class='button', href='/mp3s/' + mp3s[u].name + '/edit') #{mp3s[u].name} (#{mp3s[u].date.toString("d-MMM-yyyy")})
+

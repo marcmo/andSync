@@ -1,8 +1,42 @@
 body {
+  font: 16px "Lucida Grande", Helvetica, Arial, sans-serif;
   padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
 }
-
 a {
   color: #00B7FF;
 }
+
+#warn {
+  background-color: #fdd;
+  padding: 1em;
+  border: 1px solid red;
+  width: 50%;
+}
+
+#main {
+  width: 960px;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  padding: 1em;
+}
+#header {
+  float: right;
+  clear: both;
+}
+#user {
+  float: left;
+  margin-right: 1em;
+}
+#logout {
+  float: left;
+}
+#warn {
+  background-color: #fdd;
+  padding: 1em;
+  border: 1px solid red;
+  width: 50%;
+}
+#container {
+  clear: both;
+}
+
