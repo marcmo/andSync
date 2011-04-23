@@ -3,6 +3,8 @@
  * Module dependencies.
  */
 
+var path = require('path');
+require.paths.unshift(path.join(__dirname,'lib'));
 var express = require('express'),
     connect = require('connect'),
     jade = require('jade'),
@@ -10,11 +12,11 @@ var express = require('express'),
     mongoose = require('mongoose'),
     mongoStore = require('connect-mongodb'),
     sys = require('sys'),
-    path = require('path'),
     util = require('util'),
     log4js = require('log4js')(),
     logger = log4js.getLogger("and"),
     models = require('./models'),
+    asyncUtil = require("asyncUtil"),
     mydatabase,
     User,
     LoginToken,
@@ -29,7 +31,7 @@ app.configure(function(){
   app.use(express.bodyParser());
   app.use(express.cookieParser());
   app.use(express.session({ store: mongoStore(app.set('db-uri')), secret: 'ultrasecret' }));
-  app.use(express.logger({ format: '\x1b[1m:method\x1b[0m \x1b[33m:url\x1b[0m :response-time ms' }))
+  app.use(express.logger({ format: '\x1b[1m:method\x1b[0m \x1b[33m:url\x1b[0m :response-time ms' }));
   app.use(express.methodOverride());
   app.use(app.router);
   app.use(express.static(__dirname + '/public'));
@@ -60,29 +62,26 @@ app.get('/', function(req, res){
 });
 
 app.post('/users.:format?', function(req, res) {
-    logger.debug(util.inspect(req.body.user));
+	logger.debug("trying to crate new user: " + util.inspect(req.body.user));
   var user = new User(req.body.user);
 
   function userSaveFailed() {
-    req.flash('error', 'Account creation failed');
+    req.flash('warn', 'Account creation failed');
     res.render('users/new.jade', {
       locals: { user: user }
     });
   }
 
   user.save(function(err) {
-    if (err) return userSaveFailed();
+    if (err) {return userSaveFailed();}
 
-    req.flash('info', 'Your account has been created');
+    req.flash('notify', 'Your account has been created');
+    logger.debug('the account has been created for ' + user.email);
 
-    switch (req.params.format) {
-      case 'json':
+    if (req.params.format === 'json'){
         res.send(user.toObject());
-      break;
-
-      default:
-        res.redirect('/users');
-    }
+		}
+		res.redirect('/users');
   });
 });
 app.get('/users', function(req, res){
@@ -93,9 +92,19 @@ app.get('/users', function(req, res){
 		});
 	});
 });
-app.get('/mp3s', loadUser, function(req, res){
-	logger.debug("try to get all mp3s of current users...");
-  MusicItem.find({}, function(err, allMp3s) {
+app.get('/mp3s', requiresLogin, function(req, res){
+	logger.debug("try to get all mp3s of current users..." + req.currentUser.email);
+	logger.debug("try to get all mp3s of current users..." + req.currentUser.salt);
+	logger.debug("try to get all mp3s of current users..." + req.currentUser.item_ids);
+	logger.debug("try to get all mp3s of current users..." + req.currentUser.hashed_password);
+	var mp3Ids = req.currentUser.item_ids;
+	logger.debug(".........try to get " + util.inspect(req.currentUser));
+	// find names of all those mp3s
+  // asyncUtil.asyncMap(
+			// mp3Ids,
+			// function(mp3Id,cb){ MusicItem.find({ '_id' : mp3Id }, cb);},
+  //     function(x){ logger.debug('result was again, x=' + util.inspect(x));});
+  MusicItem.find({ '_id' : mp3Id }, function(err, allMp3s) {
 		res.render('music/mp3list', {
 			title: 'Uploaded Files',
 			locals: {mp3s: allMp3s}
@@ -116,7 +125,7 @@ app.get('/user/:id', function(req, res){
       res.send('user email:' + user.email);
     });
 });
-app.get('/user/:email/add/:id', loadUser, function(req,res) {
+app.get('/user/:email/add/:id', requiresLogin, function(req,res) {
   logger.debug("user was:" + req.params.email);
   logger.debug("mp3 was:" + req.params.id);
   User.findOne({ 'email' : req.params.email }, function(err, user) {
@@ -191,30 +200,30 @@ function authenticateFromLoginToken(req, res, next) {
   }));
 }
 
-function loadUser(req, res, next) {
-  logger.debug("loadUser middleware, req.session.user_id=" + req.session.user_id);
+function requiresLogin(req, res, next) {
+  logger.debug("requiresLogin middleware, req.session.user_id=" + req.session.user_id);
   if (req.session.user_id) {
-		logger.debug("loadUser: session found..."); 
+		logger.debug("requiresLogin: session found..."); 
     User.findById(req.session.user_id, function(err, user) {
       if (user) {
-				logger.debug("loadUser: found valid user for sessions"); 
+				logger.debug("requiresLogin: found valid user for sessions"); 
         req.currentUser = user;
         next();
       } else {
-				logger.debug("loadUser: no user found for session"); 
+				logger.debug("requiresLogin: no user found for session"); 
         res.redirect('/sessions/new');
       }
     });
   } else if (req.cookies.logintoken) {
-		logger.debug("loadUser: no session but found logintoken"); 
+		logger.debug("requiresLogin: no session but found logintoken"); 
     authenticateFromLoginToken(req, res, next);
   } else {
-		logger.debug("loadUser: no session, no logintoken"); 
+		logger.debug("requiresLogin: no session, no logintoken"); 
     res.redirect('/sessions/new');
   }
 }
 
-app.get('/', loadUser, function(req, res) {
+app.get('/', requiresLogin, function(req, res) {
   res.redirect('/mp3s')
 });
 
@@ -237,7 +246,7 @@ app.post('/sessions', function(req, res) {
       if (req.body.remember_me) {
         var loginToken = new LoginToken({ email: user.email });
         loginToken.save(function() {
-          res.cookie('logintoken', loginToken.cookieValue, { expires: new Date(Date.now() + 2 * 604800000), path: '/' });
+          res.cookie('logintoken', loginToken.cookieValue, { expires: new Date(Date.now() + 604800000), path: '/' });
           res.redirect('/mp3s');
         });
       } else {
@@ -251,7 +260,7 @@ app.post('/sessions', function(req, res) {
   }); 
 });
 
-app.get('/sessions/destroy', loadUser, function(req, res) {
+app.get('/sessions/destroy', requiresLogin, function(req, res) {
 	logger.debug("finish our session for current user: " + req.currentUser.email);
   if (req.session) {
     LoginToken.remove({ email: req.currentUser.email }, function() {});

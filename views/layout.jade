@@ -12,5 +12,7 @@ html
             a(href='/sessions/destroy') logout
       - if (flash.warn)
         p#warn= flash.warn
+      - if (flash.notify)
+        p#notification= flash.notify
       #container!= body
 

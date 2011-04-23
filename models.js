@@ -2,6 +2,8 @@ var crypto = require('crypto'),
     User,
     MusicItem,
     mongoose = require('mongoose'),
+    log4js = require('log4js')(),
+    logger = log4js.getLogger("and"),
     Schema = mongoose.Schema,
 		ObjectId = Schema.ObjectId;
 
@@ -31,6 +33,7 @@ function defineModels(mongoose, fn) {
     })
     .get(function() { return this._password; });
   User.method('authenticate', function(plainText) {
+    logger.debug("autthentication with password:" + plainText);
     if (plainText.length === 0) { return false; }
     return this.encryptPassword(plainText) === this.hashed_password;
   });
@@ -40,6 +43,7 @@ function defineModels(mongoose, fn) {
   });
 
   User.method('encryptPassword', function(password) {
+    logger.debug("encryptPassword, salt:" + this.salt + ", password:" + password);
     return crypto.createHmac('sha1', this.salt).update(password).digest('hex');
   });
 

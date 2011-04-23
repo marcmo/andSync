@@ -1,7 +1,7 @@
 .page
   h2 Log In
   p
-    a.button(href='/users/new') Create an account &rarr;
+    a.button(href='/users/new') Create an account
   form.users#login(method='post', action='/sessions')
     !=partial('../users/fields', { locals: { user: user } })
     div

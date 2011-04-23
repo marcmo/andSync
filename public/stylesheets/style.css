@@ -6,13 +6,12 @@ a {
   color: #00B7FF;
 }
 
-#warn {
-  background-color: #fdd;
+#notification {
+  background-color: #A9F5A9;
   padding: 1em;
-  border: 1px solid red;
+  border: 1px solid green;
   width: 50%;
 }
-
 #main {
   width: 960px;
   margin: 0 auto;
