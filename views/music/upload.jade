@@ -1,0 +1,11 @@
+.page
+  h2 Upload Music
+
+  form.users(method='post', action='/upload')
+    div
+      label name:
+      input(name='upload[name]', value=upload.name || '')
+
+    div
+      input(type='submit', value='upload it')
+

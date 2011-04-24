@@ -61,9 +61,57 @@ app.get('/', function(req, res){
   });
 });
 
+function saveNewItemForUser(req, res, user, mp3, cb){
+	if (!user){
+		cb("user not found: " + req.params.name);
+	} else {
+		MusicItem.findOne({ 'name' : mp3 }, function(err,i){
+			if (err){
+				logger.debug("user query returned error:" + err);
+				cb(err);
+			} else {
+				var item = (i !== null) ? i : new MusicItem();
+				item.name = mp3;
+				user.item_ids.push(item);
+				item.save(function (err){
+					if (err) {
+						logger.debug("item save failed");
+						cb("item save failed for " + req.params.name);
+					} else {
+						logger.debug("item saved");
+						user.save(userSaved);
+					}
+				});
+			}
+		});
+	}
+	function userSaved(err) {
+		if (err) {
+			logger.warn("user save failed");
+			cb("user save failed: " + req.params.name);
+		} else {
+			logger.debug("user saved");
+			User.find ({}, function(err,users){
+				cb(null);//no error occured
+			});
+		}
+	}
+}
+
+app.post('/upload.:format?', requiresLogin, function(req, res) {
+	logger.debug("new upload: " + util.inspect(req.body) + " for current user: " + req.currentUser.email);
+	saveNewItemForUser(req,res,req.currentUser,req.body.upload.name, 
+		function(err){
+			if (err){
+				logger.error("some error occured:" + err);
+			} 
+			res.redirect('/mp3s');
+		});
+});
 app.post('/users.:format?', function(req, res) {
-	logger.debug("trying to crate new user: " + util.inspect(req.body.user));
+	logger.debug("trying to create new user: " + util.inspect(req.body.user));
   var user = new User(req.body.user);
+  logger.debug("created new user..");
 
   function userSaveFailed() {
     req.flash('warn', 'Account creation failed');
@@ -77,11 +125,13 @@ app.post('/users.:format?', function(req, res) {
 
     req.flash('notify', 'Your account has been created');
     logger.debug('the account has been created for ' + user.email);
-
+		req.session.user_id = user.id;
+		req.session.usermail = user.email;
     if (req.params.format === 'json'){
         res.send(user.toObject());
+		} else {
+			res.redirect('/mp3s');
 		}
-		res.redirect('/users');
   });
 });
 app.get('/users', function(req, res){
@@ -92,31 +142,47 @@ app.get('/users', function(req, res){
 		});
 	});
 });
+app.get('/upload', requiresLogin, function(req, res){
+	logger.debug("upload was activated for current user: " + req.currentUser.email);
+  User.find({}, function(err, allUsers) {
+		res.render('music/upload', {
+			title: 'New Upload',
+			locals: {upload: {}}
+		});
+	});
+});
 app.get('/mp3s', requiresLogin, function(req, res){
-	logger.debug("try to get all mp3s of current users..." + req.currentUser.email);
-	logger.debug("try to get all mp3s of current users..." + req.currentUser.salt);
-	logger.debug("try to get all mp3s of current users..." + req.currentUser.item_ids);
-	logger.debug("try to get all mp3s of current users..." + req.currentUser.hashed_password);
+	logger.debug("try to list mp3s of users:" + req.currentUser.email +
+			", salt:" + req.currentUser.salt +
+			", item_ids.length:" + req.currentUser.item_ids.length +
+			", hashed_password:" + req.currentUser.hashed_password);
 	var mp3Ids = req.currentUser.item_ids;
-	logger.debug(".........try to get " + util.inspect(req.currentUser));
 	// find names of all those mp3s
   // asyncUtil.asyncMap(
 			// mp3Ids,
 			// function(mp3Id,cb){ MusicItem.find({ '_id' : mp3Id }, cb);},
   //     function(x){ logger.debug('result was again, x=' + util.inspect(x));});
-  MusicItem.find({ '_id' : mp3Id }, function(err, allMp3s) {
+  MusicItem.find({}, function(err, allMp3s) {
 		res.render('music/mp3list', {
 			title: 'Uploaded Files',
 			locals: {mp3s: allMp3s}
 		});
 	});
 });
+app.get('/upload/new', function(req, res) {
+	logger.debug("GET /upload/new");
+  res.render('mp3/upload.jade', {
+    locals: { upload: {} }
+  });
+});
 app.get('/users/new', function(req, res) {
+	logger.debug("GET /users/new");
   res.render('users/new.jade', {
     locals: { user: new User() }
   });
 });
 app.get('/user/:id', function(req, res){
+		logger.debug("GET /user/:id");
     User.findOne({ 'email' : req.params.id }, function(err, user) {
       if (err){
         logger.debug("user query returned error:" + err);
@@ -125,75 +191,35 @@ app.get('/user/:id', function(req, res){
       res.send('user email:' + user.email);
     });
 });
-app.get('/user/:email/add/:id', requiresLogin, function(req,res) {
-  logger.debug("user was:" + req.params.email);
-  logger.debug("mp3 was:" + req.params.id);
-  User.findOne({ 'email' : req.params.email }, function(err, user) {
-    if (err){
-      logger.debug("user query returned error:" + err);
-      res.send(JSON.stringify(err));
-    } else {
-        MusicItem.findOne({ 'email' : req.params.id }, function(err,i){
-          if (err){
-            logger.debug("user query returned error:" + err);
-            res.send(JSON.stringify(err));
-          } else {
-            var item = (i !== null) ? i : new MusicItem();
-            item.name = req.params.id;
-            if (user){
-              user.item_ids.push(item);
-              item.save(
-                function (){ user.save(userSaved,userSaveFailed); },
-                itemSaveFailed);
-            } else {
-              res.send("user not found: " + req.params.email);
-            }
 
-            function userSaved() {
-              User.find ({}, function(err,users){
-                res.send(JSON.stringify(users));
-              });
-            }
-            function userSaveFailed() {
-              res.render('users/new.jade', { locals: { user: user } });
-            }
-            function itemSaveFailed() {
-              throw "saving of item failed";
-            }
-          }
-      });
-    }
-  });
-});
-
-function authenticateFromLoginToken(req, res, next) {
-	logger.debug("authenticateFromLoginToken"); 
+function authenticateUsingLoginToken(req, res, next) {
+	logger.debug("authenticateUsingLoginToken"); 
   var cookie = JSON.parse(req.cookies.logintoken);
 
   LoginToken.findOne({ email: cookie.email,
                        series: cookie.series,
                        token: cookie.token }, (function(err, token) {
     if (!token) {
-			logger.debug("authenticateFromLoginToken, token not found for: " + req.cookies.logintoken); 
+			logger.debug("authenticateUsingLoginToken, token not found for: " + req.cookies.logintoken); 
       res.redirect('/sessions/new');
       return;
     }
 
     User.findOne({ email: token.email }, function(err, user) {
       if (user) {
-				logger.debug("authenticateFromLoginToken, found user for token"); 
+				logger.debug("authenticateUsingLoginToken, found user for token"); 
         req.session.user_id = user.id;
         req.currentUser = user;
 
         token.token = token.randomToken();
         token.save(function() {
-        	var exp = new Date(Date.now() + 2 * 604800000);
+					var exp = new Date(Date.now() + 2 * 604800000);
 					logger.debug("...new token will expire: " + exp); 
           res.cookie('logintoken', token.cookieValue, { expires: exp, path: '/' });
           next();
         });
       } else {
-				logger.debug("authenticateFromLoginToken, no user found for token"); 
+				logger.debug("authenticateUsingLoginToken, no user found for token"); 
         res.redirect('/sessions/new');
       }
     });
@@ -216,7 +242,7 @@ function requiresLogin(req, res, next) {
     });
   } else if (req.cookies.logintoken) {
 		logger.debug("requiresLogin: no session but found logintoken"); 
-    authenticateFromLoginToken(req, res, next);
+    authenticateUsingLoginToken(req, res, next);
   } else {
 		logger.debug("requiresLogin: no session, no logintoken"); 
     res.redirect('/sessions/new');
@@ -224,7 +250,7 @@ function requiresLogin(req, res, next) {
 }
 
 app.get('/', requiresLogin, function(req, res) {
-  res.redirect('/mp3s')
+  res.redirect('/mp3s');
 });
 
 // Sessions
@@ -235,7 +261,7 @@ app.get('/sessions/new', function(req, res) {
 });
 
 app.post('/sessions', function(req, res) {
-	logger.debug("post for session:" + req.body);
+	logger.debug("post for session:" + JSON.stringify(req.body));
   User.findOne({ email: req.body.user.email }, function(err, user) {
     if (user && user.authenticate(req.body.user.password)) {
 			logger.debug("post for session,user seems authenticated");
@@ -266,7 +292,9 @@ app.get('/sessions/destroy', requiresLogin, function(req, res) {
     LoginToken.remove({ email: req.currentUser.email }, function() {});
     res.clearCookie('logintoken');
     req.session.destroy(function() {});
-  }
+  } else {
+		logger.error("no session here!!!");
+	}
   res.redirect('/sessions/new');
 });
 
@@ -275,7 +303,7 @@ models.defineModels(mongoose, function() {
   app.LoginToken = LoginToken = mongoose.model('LoginToken');
   app.MusicItem = MusicItem = mongoose.model('MusicItem');
   mydatabase = mongoose.connect(app.set('db-uri'));
-})
+});
 
 // Only listen on $ node app.js
 

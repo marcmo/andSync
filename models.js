@@ -2,6 +2,7 @@ var crypto = require('crypto'),
     User,
     MusicItem,
     mongoose = require('mongoose'),
+    util = require('util'),
     log4js = require('log4js')(),
     logger = log4js.getLogger("and"),
     Schema = mongoose.Schema,
@@ -11,6 +12,7 @@ function defineModels(mongoose, fn) {
 
 
   function validatePresenceOf(value) {
+    logger.debug("validate:" + value);
     return value && value.length;
   }
 
@@ -22,16 +24,19 @@ function defineModels(mongoose, fn) {
   });
   User.virtual('id')
     .get(function() {
+      logger.debug("virtual user get id:" + JSON.stringify(this));
       return this._id.toHexString();
     });
 
   User.virtual('password')
-    .set(function(password) {
-      this._password = password;
+    .set(function(pswd) {
+      logger.debug("setting password of user:" + JSON.stringify(this) + " to " + pswd);
       this.salt = this.makeSalt();
-      this.hashed_password = this.encryptPassword(password);
+      this.hashed_password = this.encryptPassword(pswd);
     })
-    .get(function() { return this._password; });
+    .get(function() {
+      logger.debug("getting password of user:" + JSON.stringify(this));
+      return this.hashed_password; });
   User.method('authenticate', function(plainText) {
     logger.debug("autthentication with password:" + plainText);
     if (plainText.length === 0) { return false; }
@@ -39,6 +44,7 @@ function defineModels(mongoose, fn) {
   });
   
   User.method('makeSalt', function() {
+    logger.debug("makeSalt");
     return Math.round((new Date().valueOf() * Math.random())) + '';
   });
 
@@ -48,6 +54,7 @@ function defineModels(mongoose, fn) {
   });
 
   User.pre('save', function(next) {
+    logger.debug("pre-save, this=" + JSON.stringify(this));
     if (!validatePresenceOf(this.password)) {
       next(new Error('Invalid password'));
     } else {
