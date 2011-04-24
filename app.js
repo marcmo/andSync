@@ -1,8 +1,3 @@
-
-/**
- * Module dependencies.
- */
-
 var path = require('path');
 require.paths.unshift(path.join(__dirname,'lib'));
 var express = require('express'),
@@ -30,7 +25,7 @@ app.configure(function(){
   app.set('view engine', 'jade');
   app.use(express.bodyParser());
   app.use(express.cookieParser());
-  app.use(express.session({ store: mongoStore(app.set('db-uri')), secret: 'ultrasecret' }));
+  app.use(express.session({ store: mongoStore(app.set('db-uri')), secret: 'andsyncsecret' }));
   app.use(express.logger({ format: '\x1b[1m:method\x1b[0m \x1b[33m:url\x1b[0m :response-time ms' }));
   app.use(express.methodOverride());
   app.use(app.router);
@@ -44,22 +39,72 @@ app.configure(function(){
 });
 
 app.configure('development', function(){
-  app.set('db-uri', 'mongodb://localhost/mynodepad-development');
+  app.set('db-uri', 'mongodb://localhost/andsync-dev');
   app.use(express.errorHandler({ dumpExceptions: true, showStack: true })); 
 });
 
 app.configure('production', function(){
-  app.set('db-uri', 'mongodb://localhost/mynodepad-production');
+  app.set('db-uri', 'mongodb://localhost/andsync-production');
   app.use(express.errorHandler()); 
 });
 
-// Routes
+// authentication
+function authenticateUsingLoginToken(req, res, next) {
+	logger.debug("authenticateUsingLoginToken"); 
+  var cookie = JSON.parse(req.cookies.logintoken);
 
-app.get('/', function(req, res){
-  res.render('index', {
-    title: 'Express'
-  });
-});
+  LoginToken.findOne({ email: cookie.email,
+                       series: cookie.series,
+                       token: cookie.token }, (function(err, token) {
+    if (!token) {
+			logger.debug("...token not found for: " + req.cookies.logintoken); 
+      res.redirect('/sessions/new');
+      return;
+    }
+
+    User.findOne({ email: token.email }, function(err, user) {
+      if (user) {
+				logger.debug("...found user for token"); 
+        req.session.user_id = user.id;
+        req.currentUser = user;
+
+        token.token = token.randomToken();
+        token.save(function() {
+					var exp = new Date(Date.now() + 2 * 604800000);
+					logger.debug("...new token will expire: " + exp); 
+          res.cookie('logintoken', token.cookieValue, { expires: exp, path: '/' });
+          next();
+        });
+      } else {
+				logger.debug("...no user found for token"); 
+        res.redirect('/sessions/new');
+      }
+    });
+  }));
+}
+
+function requiresLogin(req, res, next) {
+  logger.debug("requiresLogin middleware, req.session.user_id=" + req.session.user_id);
+  if (req.session.user_id) {
+		logger.debug("session found..."); 
+    User.findById(req.session.user_id, function(err, user) {
+      if (user) {
+				logger.debug("valid user for sessions"); 
+        req.currentUser = user;
+        next();
+      } else {
+				logger.debug("no user found for session"); 
+        res.redirect('/sessions/new');
+      }
+    });
+  } else if (req.cookies.logintoken) {
+		logger.debug("no session but found logintoken"); 
+    authenticateUsingLoginToken(req, res, next);
+  } else {
+		logger.debug("no session, no logintoken"); 
+    res.redirect('/sessions/new');
+  }
+}
 
 function saveNewItemForUser(req, res, user, mp3, cb){
 	if (!user){
@@ -98,6 +143,31 @@ function saveNewItemForUser(req, res, user, mp3, cb){
 	}
 }
 
+// Routes
+
+app.get('/', function(req, res){
+  res.render('index', {
+    title: 'Express'
+  });
+});
+
+app.get('/upload', requiresLogin, function(req, res){
+	logger.debug("upload was activated for current user: " + req.currentUser.email);
+  User.find({}, function(err, allUsers) {
+		res.render('music/upload', {
+			title: 'New Upload',
+			locals: {upload: {}}
+		});
+	});
+});
+
+app.get('/upload/new', function(req, res) {
+	logger.debug("GET /upload/new");
+  res.render('mp3/upload.jade', {
+    locals: { upload: {} }
+  });
+});
+
 app.post('/upload.:format?', requiresLogin, function(req, res) {
 	logger.debug("new upload: " + util.inspect(req.body) + " for current user: " + req.currentUser.email);
 	saveNewItemForUser(req,res,req.currentUser,req.body.upload.name, 
@@ -108,6 +178,7 @@ app.post('/upload.:format?', requiresLogin, function(req, res) {
 			res.redirect('/mp3s');
 		});
 });
+
 app.post('/users.:format?', function(req, res) {
 	logger.debug("trying to create new user: " + util.inspect(req.body.user));
   var user = new User(req.body.user);
@@ -134,6 +205,7 @@ app.post('/users.:format?', function(req, res) {
 		}
   });
 });
+
 app.get('/users', function(req, res){
   User.find({}, function(err, allUsers) {
 		res.render('users/userlist', {
@@ -142,45 +214,35 @@ app.get('/users', function(req, res){
 		});
 	});
 });
-app.get('/upload', requiresLogin, function(req, res){
-	logger.debug("upload was activated for current user: " + req.currentUser.email);
-  User.find({}, function(err, allUsers) {
-		res.render('music/upload', {
-			title: 'New Upload',
-			locals: {upload: {}}
-		});
-	});
-});
+
 app.get('/mp3s', requiresLogin, function(req, res){
 	logger.debug("try to list mp3s of users:" + req.currentUser.email +
 			", salt:" + req.currentUser.salt +
 			", item_ids.length:" + req.currentUser.item_ids.length +
 			", hashed_password:" + req.currentUser.hashed_password);
 	var mp3Ids = req.currentUser.item_ids;
-	// find names of all those mp3s
-  // asyncUtil.asyncMap(
-			// mp3Ids,
-			// function(mp3Id,cb){ MusicItem.find({ '_id' : mp3Id }, cb);},
-  //     function(x){ logger.debug('result was again, x=' + util.inspect(x));});
-  MusicItem.find({}, function(err, allMp3s) {
-		res.render('music/mp3list', {
-			title: 'Uploaded Files',
-			locals: {mp3s: allMp3s}
-		});
-	});
+	// find out names of all those mp3s
+  asyncUtil.asyncMapWithError(
+     mp3Ids,
+     function(x,cb){
+       MusicItem.findOne({'_id': x}, cb);
+     },
+     function(err, mp3Names){
+       logger.debug('result was again, x=' + JSON.stringify(mp3Names));
+       res.render('music/mp3list', {
+         title: 'Uploaded Files',
+         locals: {mp3s: mp3Names}
+       });
+     });
 });
-app.get('/upload/new', function(req, res) {
-	logger.debug("GET /upload/new");
-  res.render('mp3/upload.jade', {
-    locals: { upload: {} }
-  });
-});
+
 app.get('/users/new', function(req, res) {
 	logger.debug("GET /users/new");
   res.render('users/new.jade', {
     locals: { user: new User() }
   });
 });
+
 app.get('/user/:id', function(req, res){
 		logger.debug("GET /user/:id");
     User.findOne({ 'email' : req.params.id }, function(err, user) {
@@ -191,63 +253,6 @@ app.get('/user/:id', function(req, res){
       res.send('user email:' + user.email);
     });
 });
-
-function authenticateUsingLoginToken(req, res, next) {
-	logger.debug("authenticateUsingLoginToken"); 
-  var cookie = JSON.parse(req.cookies.logintoken);
-
-  LoginToken.findOne({ email: cookie.email,
-                       series: cookie.series,
-                       token: cookie.token }, (function(err, token) {
-    if (!token) {
-			logger.debug("authenticateUsingLoginToken, token not found for: " + req.cookies.logintoken); 
-      res.redirect('/sessions/new');
-      return;
-    }
-
-    User.findOne({ email: token.email }, function(err, user) {
-      if (user) {
-				logger.debug("authenticateUsingLoginToken, found user for token"); 
-        req.session.user_id = user.id;
-        req.currentUser = user;
-
-        token.token = token.randomToken();
-        token.save(function() {
-					var exp = new Date(Date.now() + 2 * 604800000);
-					logger.debug("...new token will expire: " + exp); 
-          res.cookie('logintoken', token.cookieValue, { expires: exp, path: '/' });
-          next();
-        });
-      } else {
-				logger.debug("authenticateUsingLoginToken, no user found for token"); 
-        res.redirect('/sessions/new');
-      }
-    });
-  }));
-}
-
-function requiresLogin(req, res, next) {
-  logger.debug("requiresLogin middleware, req.session.user_id=" + req.session.user_id);
-  if (req.session.user_id) {
-		logger.debug("requiresLogin: session found..."); 
-    User.findById(req.session.user_id, function(err, user) {
-      if (user) {
-				logger.debug("requiresLogin: found valid user for sessions"); 
-        req.currentUser = user;
-        next();
-      } else {
-				logger.debug("requiresLogin: no user found for session"); 
-        res.redirect('/sessions/new');
-      }
-    });
-  } else if (req.cookies.logintoken) {
-		logger.debug("requiresLogin: no session but found logintoken"); 
-    authenticateUsingLoginToken(req, res, next);
-  } else {
-		logger.debug("requiresLogin: no session, no logintoken"); 
-    res.redirect('/sessions/new');
-  }
-}
 
 app.get('/', requiresLogin, function(req, res) {
   res.redirect('/mp3s');
