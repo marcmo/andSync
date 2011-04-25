@@ -1,0 +1,17 @@
+{
+  "name": "andSync",
+  "description": "node backand for upload/download of android synced music",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+      "express": "2.x"
+    , "express-resource": ">= 0.0.1"
+    , "express-expose": ">= 0.0.1"
+    , "jade": "0.10.x"
+    , "connect": "0.1.x"
+    , "connect-mongodb": "0.2.2"
+    , "log4js": "0.2.x"
+    , "mongoose": "1.2.x"
+  },
+  "engines": { "node": ">= 0.4.5" }
+}

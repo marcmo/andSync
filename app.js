@@ -2,8 +2,9 @@ var path = require('path');
 require.paths.unshift(path.join(__dirname,'lib'));
 var express = require('express'),
     connect = require('connect'),
+    form = require('connect-form'),
     jade = require('jade'),
-    app = module.exports = express.createServer(),
+    app = module.exports = express.createServer(form({ keepExtensions: true })),
     mongoose = require('mongoose'),
     mongoStore = require('connect-mongodb'),
     sys = require('sys'),
@@ -30,12 +31,12 @@ app.configure(function(){
   app.use(express.methodOverride());
   app.use(app.router);
   app.use(express.static(__dirname + '/public'));
-	app.dynamicHelpers(
-		{
-			session: function(req, res) { return req.session; },
-			flash: function(req, res) { return req.flash(); }
-		}
-	);
+  app.dynamicHelpers(
+    {
+      session: function(req, res) { return req.session; },
+      flash: function(req, res) { return req.flash(); }
+    }
+  );
 });
 
 app.configure('development', function(){
@@ -50,33 +51,33 @@ app.configure('production', function(){
 
 // authentication
 function authenticateUsingLoginToken(req, res, next) {
-	logger.debug("authenticateUsingLoginToken"); 
+  logger.debug("authenticateUsingLoginToken"); 
   var cookie = JSON.parse(req.cookies.logintoken);
 
   LoginToken.findOne({ email: cookie.email,
                        series: cookie.series,
                        token: cookie.token }, (function(err, token) {
     if (!token) {
-			logger.debug("...token not found for: " + req.cookies.logintoken); 
+      logger.debug("...token not found for: " + req.cookies.logintoken); 
       res.redirect('/sessions/new');
       return;
     }
 
     User.findOne({ email: token.email }, function(err, user) {
       if (user) {
-				logger.debug("...found user for token"); 
+        logger.debug("...found user for token"); 
         req.session.user_id = user.id;
         req.currentUser = user;
 
         token.token = token.randomToken();
         token.save(function() {
-					var exp = new Date(Date.now() + 2 * 604800000);
-					logger.debug("...new token will expire: " + exp); 
+          var exp = new Date(Date.now() + 2 * 604800000);
+          logger.debug("...new token will expire: " + exp); 
           res.cookie('logintoken', token.cookieValue, { expires: exp, path: '/' });
           next();
         });
       } else {
-				logger.debug("...no user found for token"); 
+        logger.debug("...no user found for token"); 
         res.redirect('/sessions/new');
       }
     });
@@ -86,61 +87,61 @@ function authenticateUsingLoginToken(req, res, next) {
 function requiresLogin(req, res, next) {
   logger.debug("requiresLogin middleware, req.session.user_id=" + req.session.user_id);
   if (req.session.user_id) {
-		logger.debug("session found..."); 
+    logger.debug("session found..."); 
     User.findById(req.session.user_id, function(err, user) {
       if (user) {
-				logger.debug("valid user for sessions"); 
+        logger.debug("valid user for sessions"); 
         req.currentUser = user;
         next();
       } else {
-				logger.debug("no user found for session"); 
+        logger.debug("no user found for session"); 
         res.redirect('/sessions/new');
       }
     });
   } else if (req.cookies.logintoken) {
-		logger.debug("no session but found logintoken"); 
+    logger.debug("no session but found logintoken"); 
     authenticateUsingLoginToken(req, res, next);
   } else {
-		logger.debug("no session, no logintoken"); 
+    logger.debug("no session, no logintoken"); 
     res.redirect('/sessions/new');
   }
 }
 
 function saveNewItemForUser(req, res, user, mp3, cb){
-	if (!user){
-		cb("user not found: " + req.params.name);
-	} else {
-		MusicItem.findOne({ 'name' : mp3 }, function(err,i){
-			if (err){
-				logger.debug("user query returned error:" + err);
-				cb(err);
-			} else {
-				var item = (i !== null) ? i : new MusicItem();
-				item.name = mp3;
-				user.item_ids.push(item);
-				item.save(function (err){
-					if (err) {
-						logger.debug("item save failed");
-						cb("item save failed for " + req.params.name);
-					} else {
-						logger.debug("item saved");
-						user.save(userSaved);
-					}
-				});
-			}
-		});
-	}
-	function userSaved(err) {
-		if (err) {
-			logger.warn("user save failed");
-			cb("user save failed: " + req.params.name);
-		} else {
-			logger.debug("user saved");
-			User.find ({}, function(err,users){
-				cb(null);//no error occured
-			});
-		}
-	}
+  if (!user){
+    cb("user not found: " + req.params.name);
+  } else {
+    MusicItem.findOne({ 'name' : mp3 }, function(err,i){
+      if (err){
+        logger.debug("user query returned error:" + err);
+        cb(err);
+      } else {
+        var item = (i !== null) ? i : new MusicItem();
+        item.name = mp3;
+        user.item_ids.push(item);
+        item.save(function (err){
+          if (err) {
+            logger.debug("item save failed");
+            cb("item save failed for " + req.params.name);
+          } else {
+            logger.debug("item saved");
+            user.save(userSaved);
+          }
+        });
+      }
+    });
+  }
+  function userSaved(err) {
+    if (err) {
+      logger.warn("user save failed");
+      cb("user save failed: " + req.params.name);
+    } else {
+      logger.debug("user saved");
+      User.find ({}, function(err,users){
+        cb(null);//no error occured
+      });
+    }
+  }
 }
 
 // Routes
@@ -152,35 +153,51 @@ app.get('/', function(req, res){
 });
 
 app.get('/upload', requiresLogin, function(req, res){
-	logger.debug("upload was activated for current user: " + req.currentUser.email);
+  logger.debug("upload was activated for current user: " + req.currentUser.email);
   User.find({}, function(err, allUsers) {
-		res.render('music/upload', {
-			title: 'New Upload',
-			locals: {upload: {}}
-		});
-	});
+    res.render('music/upload', {
+      title: 'New Upload',
+      locals: {upload: {}}
+    });
+  });
 });
 
 app.get('/upload/new', function(req, res) {
-	logger.debug("GET /upload/new");
+  logger.debug("GET /upload/new");
   res.render('mp3/upload.jade', {
     locals: { upload: {} }
   });
 });
 
 app.post('/upload.:format?', requiresLogin, function(req, res) {
-	logger.debug("new upload: " + util.inspect(req.body) + " for current user: " + req.currentUser.email);
-	saveNewItemForUser(req,res,req.currentUser,req.body.upload.name, 
-		function(err){
-			if (err){
-				logger.error("some error occured:" + err);
-			} 
-			res.redirect('/mp3s');
-		});
+  logger.debug("new upload: " + util.inspect(req.form) + " for current user: " + req.currentUser.email);
+  req.form.complete(function(err, fields, files){
+      if (err) {
+        next(err);
+      } else {
+        logger.debug('uploaded' + files.image.filename + ' to ' + files.image.path);
+        res.redirect('/mp3s');
+      }
+    });
+
+    // We can add listeners for several form
+    // events such as "progress"
+    req.form.on('progress', function(bytesReceived, bytesExpected){
+      var percent = (bytesReceived / bytesExpected * 100) | 0;
+      logger.debug('Uploading: ' + percent);
+    });
+  
+  // saveNewItemForUser(req,res,req.currentUser,req.body.upload.name, 
+  //  function(err){
+  //    if (err){
+  //      logger.error("some error occured:" + err);
+  //    } 
+  //    res.redirect('/mp3s');
+  //  });
 });
 
 app.post('/users.:format?', function(req, res) {
-	logger.debug("trying to create new user: " + util.inspect(req.body.user));
+  logger.debug("trying to create new user: " + util.inspect(req.body.user));
   var user = new User(req.body.user);
   logger.debug("created new user..");
 
@@ -196,32 +213,32 @@ app.post('/users.:format?', function(req, res) {
 
     req.flash('notify', 'Your account has been created');
     logger.debug('the account has been created for ' + user.email);
-		req.session.user_id = user.id;
-		req.session.usermail = user.email;
+    req.session.user_id = user.id;
+    req.session.usermail = user.email;
     if (req.params.format === 'json'){
         res.send(user.toObject());
-		} else {
-			res.redirect('/mp3s');
-		}
+    } else {
+      res.redirect('/mp3s');
+    }
   });
 });
 
 app.get('/users', function(req, res){
   User.find({}, function(err, allUsers) {
-		res.render('users/userlist', {
-			title: 'Registered Users',
-			locals: {users: allUsers}
-		});
-	});
+    res.render('users/userlist', {
+      title: 'Registered Users',
+      locals: {users: allUsers}
+    });
+  });
 });
 
 app.get('/mp3s', requiresLogin, function(req, res){
-	logger.debug("try to list mp3s of users:" + req.currentUser.email +
-			", salt:" + req.currentUser.salt +
-			", item_ids.length:" + req.currentUser.item_ids.length +
-			", hashed_password:" + req.currentUser.hashed_password);
-	var mp3Ids = req.currentUser.item_ids;
-	// find out names of all those mp3s
+  logger.debug("try to list mp3s of users:" + req.currentUser.email +
+      ", salt:" + req.currentUser.salt +
+      ", item_ids.length:" + req.currentUser.item_ids.length +
+      ", hashed_password:" + req.currentUser.hashed_password);
+  var mp3Ids = req.currentUser.item_ids;
+  // find out names of all those mp3s
   asyncUtil.asyncMapWithError(
      mp3Ids,
      function(x,cb){
@@ -237,14 +254,14 @@ app.get('/mp3s', requiresLogin, function(req, res){
 });
 
 app.get('/users/new', function(req, res) {
-	logger.debug("GET /users/new");
+  logger.debug("GET /users/new");
   res.render('users/new.jade', {
     locals: { user: new User() }
   });
 });
 
 app.get('/user/:id', function(req, res){
-		logger.debug("GET /user/:id");
+    logger.debug("GET /user/:id");
     User.findOne({ 'email' : req.params.id }, function(err, user) {
       if (err){
         logger.debug("user query returned error:" + err);
@@ -266,10 +283,10 @@ app.get('/sessions/new', function(req, res) {
 });
 
 app.post('/sessions', function(req, res) {
-	logger.debug("post for session:" + JSON.stringify(req.body));
+  logger.debug("post for session:" + JSON.stringify(req.body));
   User.findOne({ email: req.body.user.email }, function(err, user) {
     if (user && user.authenticate(req.body.user.password)) {
-			logger.debug("post for session,user seems authenticated");
+      logger.debug("post for session,user seems authenticated");
       req.session.user_id = user.id;
       req.session.usermail = user.email;
 
@@ -284,7 +301,7 @@ app.post('/sessions', function(req, res) {
         res.redirect('/mp3s');
       }
     } else {
-			logger.debug("post for session, Incorrect credentials");
+      logger.debug("post for session, Incorrect credentials");
       req.flash('warn', 'Login failed');
       res.redirect('/sessions/new');
     }
@@ -292,14 +309,14 @@ app.post('/sessions', function(req, res) {
 });
 
 app.get('/sessions/destroy', requiresLogin, function(req, res) {
-	logger.debug("finish our session for current user: " + req.currentUser.email);
+  logger.debug("finish our session for current user: " + req.currentUser.email);
   if (req.session) {
     LoginToken.remove({ email: req.currentUser.email }, function() {});
     res.clearCookie('logintoken');
     req.session.destroy(function() {});
   } else {
-		logger.error("no session here!!!");
-	}
+    logger.error("no session here!!!");
+  }
   res.redirect('/sessions/new');
 });
 
@@ -314,5 +331,5 @@ models.defineModels(mongoose, function() {
 
 if (!module.parent) {
   app.listen(3001);
-	logger.info("Express server listening on port " + app.address().port);
+  logger.info("Express server listening on port " + app.address().port);
 }

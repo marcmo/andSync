@@ -9,3 +9,13 @@
     div
       input(type='submit', value='upload it')
 
+  form(id='file_upload',action='/upload',method='POST',enctype='multipart/form-data')
+    input(type='file', name='file[]', multiple)
+
+    button Upload
+
+    div.file_upload_label Upload files
+
+  table(id='files')
+
+
