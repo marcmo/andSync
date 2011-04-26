@@ -1,13 +1,8 @@
 .page
   h2 Upload Music
 
-  form.users(method='post', action='/upload')
-    div
-      label name:
-      input(name='upload[name]', value=upload.name || '')
-
-    div
-      input(type='submit', value='upload it')
+  p
+    a(class='button', href='/mp3s/') view uploaded mp3s
 
   form(id='file_upload',action='/upload',method='POST',enctype='multipart/form-data')
     input(type='file', name='file[]', multiple)

@@ -7,6 +7,7 @@
       "express": "2.x"
     , "express-resource": ">= 0.0.1"
     , "express-expose": ">= 0.0.1"
+    , "connect-form": "0.2.x"
     , "jade": "0.10.x"
     , "connect": "0.1.x"
     , "connect-mongodb": "0.2.2"

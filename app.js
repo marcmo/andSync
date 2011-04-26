@@ -1,9 +1,14 @@
 var path = require('path');
 require.paths.unshift(path.join(__dirname,'lib'));
 var express = require('express'),
+    fs = require('fs'),
     connect = require('connect'),
     form = require('connect-form'),
+    jquery = require("jquery"),
+    formidable = require('formidable'),
+    incomingForm = new formidable.IncomingForm(),
     jade = require('jade'),
+    // app = module.exports = express.createServer(),
     app = module.exports = express.createServer(form({ keepExtensions: true })),
     mongoose = require('mongoose'),
     mongoStore = require('connect-mongodb'),
@@ -18,6 +23,11 @@ var express = require('express'),
     LoginToken,
     MusicItem,
     Settings = { development: {}, test: {}, production: {} };
+
+global.UPLOADDIR = path.join(__dirname, 'uploadDir');
+global.p = function() {
+  util.error(util.inspect.apply(null, arguments));
+};
 
 // Configuration
 
@@ -92,6 +102,7 @@ function requiresLogin(req, res, next) {
       if (user) {
         logger.debug("valid user for sessions"); 
         req.currentUser = user;
+        global.currentUser = user;
         next();
       } else {
         logger.debug("no user found for session"); 
@@ -169,31 +180,51 @@ app.get('/upload/new', function(req, res) {
   });
 });
 
-app.post('/upload.:format?', requiresLogin, function(req, res) {
-  logger.debug("new upload: " + util.inspect(req.form) + " for current user: " + req.currentUser.email);
-  req.form.complete(function(err, fields, files){
-      if (err) {
-        next(err);
-      } else {
-        logger.debug('uploaded' + files.image.filename + ' to ' + files.image.path);
-        res.redirect('/mp3s');
-      }
-    });
+//TODO reactivate login...but does not seem to work like this..
+// app.post('/upload.:format?', requiresLogin, function(req, res) {
+app.post('/upload.:format?', function(req, res) {
+  logger.debug("upload for user:" + global.currentUser.email);
+  var incomingForm = new formidable.IncomingForm(),
+  files = [],
+  currentFile;
 
-    // We can add listeners for several form
-    // events such as "progress"
-    req.form.on('progress', function(bytesReceived, bytesExpected){
-      var percent = (bytesReceived / bytesExpected * 100) | 0;
-      logger.debug('Uploading: ' + percent);
-    });
-  
-  // saveNewItemForUser(req,res,req.currentUser,req.body.upload.name, 
-  //  function(err){
-  //    if (err){
-  //      logger.error("some error occured:" + err);
-  //    } 
-  //    res.redirect('/mp3s');
-  //  });
+  incomingForm.uploadDir = UPLOADDIR;
+  incomingForm.keepExtensions = true;
+
+	incomingForm
+    .on('error', function(err) {
+			logger.debug("error on upload:" + err);
+      res.writeHead(200, {'content-type': 'text/plain'});
+      res.end('error:\n\n'+util.inspect(err));
+  }).on('file', function(field, file) {
+			logger.debug("was a file in upload::" + file.filename);
+			files.push([field, file]);
+			currentFile = file;
+  }).on('progress', function(received, expected) {
+      var progress = (received / expected * 100).toFixed(2);
+      var mb = (expected / 1024 / 1024).toFixed(1);
+      logger.debug("received/expected:" + received + " - " + expected);
+      logger.debug("Uploading "+mb+"mb ("+progress+"%)\015");
+  }).on('end', function() {
+			logger.debug('-> upload done');
+			// res.writeHead(200, {'content-type': 'text/plain'});
+			var responseObject = [];
+			jquery.map(files, function(f){
+				responseObject.push({name:f[1].filename,size:f[1].length});
+			});
+			if (!currentFile){
+				return;
+			}
+			fs.rename(currentFile.path,
+				path.join(UPLOADDIR,currentFile.filename),
+				function(){
+					saveNewItemForUser(req, res, global.currentUser, currentFile.filename, function(){
+						res.redirect('/mp3s');
+					});
+				}
+      );
+	});
+  incomingForm.parse(req);
 });
 
 app.post('/users.:format?', function(req, res) {
