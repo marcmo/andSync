@@ -8,8 +8,8 @@ var express = require('express'),
     formidable = require('formidable'),
     incomingForm = new formidable.IncomingForm(),
     jade = require('jade'),
-    // app = module.exports = express.createServer(),
     app = module.exports = express.createServer(form({ keepExtensions: true })),
+    cryptoHelper = require("cryptoHelper"),
     mongoose = require('mongoose'),
     mongoStore = require('connect-mongodb'),
     sys = require('sys'),
@@ -28,6 +28,7 @@ global.UPLOADDIR = path.join(__dirname, 'uploadDir');
 global.p = function() {
   util.error(util.inspect.apply(null, arguments));
 };
+asyncUtil.ensureDirectory(UPLOADDIR, function() {});
 
 // Configuration
 
@@ -118,27 +119,36 @@ function requiresLogin(req, res, next) {
   }
 }
 
-function saveNewItemForUser(req, res, user, mp3, cb){
+function saveNewItemForUser(req, res, user, mp3, sha1, cb){
   if (!user){
     cb("user not found: " + req.params.name);
   } else {
-    MusicItem.findOne({ 'name' : mp3 }, function(err,i){
+    MusicItem.findOne({ 'sha1' : sha1 }, function(err,i){
       if (err){
         logger.debug("user query returned error:" + err);
         cb(err);
       } else {
-        var item = (i !== null) ? i : new MusicItem();
-        item.name = mp3;
-        user.item_ids.push(item);
-        item.save(function (err){
-          if (err) {
-            logger.debug("item save failed");
-            cb("item save failed for " + req.params.name);
-          } else {
-            logger.debug("item saved");
-            user.save(userSaved);
-          }
-        });
+        var item;
+        if (i !== null) {
+        	item = i;
+					user.item_ids.push(item);
+					user.save(userSaved);
+				}
+				else {
+					item = new MusicItem();
+					item.name = mp3;
+					item.sha1 = sha1;
+					user.item_ids.push(item);
+					item.save(function (err){
+						if (err) {
+							logger.debug("item save failed");
+							cb("item save failed for " + req.params.name);
+						} else {
+							logger.debug("item saved");
+							user.save(userSaved);
+						}
+					});
+				}
       }
     });
   }
@@ -154,6 +164,56 @@ function saveNewItemForUser(req, res, user, mp3, cb){
     }
   }
 }
+
+function serveStaticFile(filename, req, res) {
+  var range = req.headers.range;
+  path.exists(filename, function(exists) {
+    if(!exists) {
+      logger.warn(filename + " did not exist");
+      res.writeHead(404, {"Content-Type": "text/plain"});  
+      res.write("404 Not Found\n");  
+      res.end();  
+      return;  
+    } 
+    var fileStat = fs.statSync(filename);
+    if (range){
+      logger.debug("serving static file, was partial get with: " + range);
+      var total = fileStat.size; 
+      var parts = range.replace(/bytes=/, "").split("-"); 
+      var partStart = parseInt(parts[0], 10); 
+      var partEnd = parts[1] ? parseInt(parts[1], 10) : total-1; 
+      var chunksize = partEnd-partStart+1; 
+      logger.debug("start:" + partStart + ",end"+partEnd+" (total: "+total+")");
+      res.writeHead(206, {
+        "Content-Range": "bytes " + partStart + "-" + partEnd + "/" + total,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunksize
+      }); 
+      fs.createReadStream(filename,{'start' : partStart, 'end' : partEnd, 'flags': 'r',
+																		'encoding': 'binary', 'mode': 0666, 'bufferSize': 16 * 1024})
+        .addListener("data", function(chunk){
+        	logger.debug("data chunk...");
+          res.write(chunk, 'binary');
+        })
+        .addListener("close",function() {
+        	logger.debug("close of read stream...");
+          res.end();
+        }); 
+    } else {
+			res.writeHead(200);  
+      fs.createReadStream(filename,{'flags': 'r',
+																		'encoding': 'binary', 'mode': 0666, 'bufferSize': 16 * 1024})
+        .addListener("data", function(chunk){
+          res.write(chunk, 'binary');
+        })
+        .addListener("close",function() {
+        	logger.debug("close of read stream...");
+          res.end();
+        }); 
+    }
+  });  
+}
+
 
 // Routes
 
@@ -178,6 +238,13 @@ app.get('/upload/new', function(req, res) {
   res.render('mp3/upload.jade', {
     locals: { upload: {} }
   });
+});
+
+app.get('/download/:id', requiresLogin, function(req, res){
+  logger.debug("download was activated for current user: " + req.currentUser.email);
+			// req.currentUser  //TODO need to check if current user owns this file!
+	var filePath = path.join(UPLOADDIR, req.params.id);
+	serveStaticFile(filePath, req, res);
 });
 
 //TODO reactivate login...but does not seem to work like this..
@@ -215,14 +282,28 @@ app.post('/upload.:format?', function(req, res) {
 			if (!currentFile){
 				return;
 			}
-			fs.rename(currentFile.path,
-				path.join(UPLOADDIR,currentFile.filename),
-				function(){
-					saveNewItemForUser(req, res, global.currentUser, currentFile.filename, function(){
-						res.redirect('/mp3s');
-					});
-				}
-      );
+			cryptoHelper.calcSha1([currentFile.path], function (sha1) {
+				var newFileName = currentFile.filename + '___' + sha1;
+				var newPath = path.join(UPLOADDIR, newFileName);
+				path.exists(newPath, function (exists) {
+					if (exists){
+						logger.debug("file already existed");
+						fs.unlink(currentFile.path, function(err){
+								saveNewItemForUser(req, res, global.currentUser, currentFile.filename, sha1, function(){
+										res.redirect('/mp3s');
+								});
+						});
+					} else {
+						logger.debug("saving new file into upload directory");
+						fs.rename(currentFile.path, newPath, function(){
+								saveNewItemForUser(req, res, global.currentUser, currentFile.filename, sha1, function(){
+										res.redirect('/mp3s');
+								});
+						});
+					}
+				});
+
+			});
 	});
   incomingForm.parse(req);
 });

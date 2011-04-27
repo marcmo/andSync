@@ -1,13 +1,28 @@
 body {
   font: 16px "Lucida Grande", Helvetica, Arial, sans-serif;
   padding: 50px;
+  background: #22252a;
+  color: #eee;
+  line-height: 150%;
+  margin: 0 0 5em 9em;
 }
-a {
-  color: #00B7FF;
+a { color: #cd5; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4 {
+  color: #CBD4DF;
+  margin: 2em 0; 
 }
 
+h1 code, h2 code, h3 code, h4 code, 
+h1 a, h2 a, h3 a, h4 a 
+{ 
+  color: inherit; 
+  font-size: inherit; 
+}
 #notification {
   background-color: #A9F5A9;
+  color: black;
   padding: 1em;
   border: 1px solid green;
   width: 50%;
@@ -31,6 +46,7 @@ a {
 }
 #warn {
   background-color: #fdd;
+  color: black;
   padding: 1em;
   border: 1px solid red;
   width: 50%;

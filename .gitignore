@@ -3,3 +3,4 @@ log4js.log
 log4js_util.log
 node_modules
 uploadDir
+logs

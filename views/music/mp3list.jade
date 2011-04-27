@@ -2,11 +2,9 @@
 h1= title
 
 p
-  a(class='button', href='/users/') view users
-p
   a(class='button', href='/upload/') upload new file
 ul
   - for (var u in mp3s)
     li
-      a(class='button', href='/mp3s/' + mp3s[u].name + '/edit') #{mp3s[u].name} (#{mp3s[u].date})
+      a(class='button', href='/download/' + mp3s[u].name + '___' + mp3s[u].sha1) #{mp3s[u].name} (#{mp3s[u].date})
 

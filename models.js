@@ -100,6 +100,7 @@ function defineModels(mongoose, fn) {
 
   MusicItem = new Schema({
     'name'  : String,
+    'sha1'  : String,
     'date'  :  { type: Date, default: Date.now }
   });
 

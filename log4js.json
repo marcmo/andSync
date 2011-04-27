@@ -3,7 +3,7 @@
     { 
       "category": "and", 
       "type": "file", 
-      "filename": "log4js.log"
+      "filename": "logs/log4js.log"
     },
     { 
       "category": "and", 
@@ -12,12 +12,12 @@
     { 
       "category": "asyncUtil", 
       "type": "file", 
-      "filename": "log4js_util.log"
+      "filename": "logs/log4js_util.log"
     },
     { 
       "category": "crypto", 
       "type": "file", 
-      "filename": "log4js_crypto.log"
+      "filename": "logs/log4js_crypto.log"
     }
   ],
   
