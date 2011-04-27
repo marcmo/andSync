@@ -15,10 +15,6 @@ import Control.Exception(bracket,finally)
 import Directory(getCurrentDirectory)
 import qualified Data.ByteString as BS
 
-import Test.Framework (defaultMain, testGroup)
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2 (testProperty)
-
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
 import qualified Test.HUnit as T
@@ -28,15 +24,8 @@ main = do
     uploadAndThenDownload
     q 10 $ label "prop_createAndDeleteUsers" prop_createAndDeleteUsers
     q 10 $ label "prop_partialDownload" prop_partialDownload
-    -- defaultMain tests
       where
         q n = quickCheckWith $ stdArgs { maxSuccess = n }
-
-tests = [
-        testGroup "rest api Group" [
-                -- testProperty "create/deleta users property" prop_createAndDeleteUsers
-            ]
-    ]
 
 newtype User = User { name :: String } deriving (Show)
 instance Arbitrary User where
@@ -115,6 +104,19 @@ createAndDeleteUserContent = do
             deleteFromUser user file
             contentC <- getUserContent user
             T.assertEqual "content before and after should be the same" contentA contentC
+
+deleteAllFilesFromUser :: IO ()
+deleteAllFilesFromUser = do
+    let user = "testUserXYZ123"
+    bracket (createUser user) (\_->eraseOneUser user) $ \_->do
+            path <- getCurrentDirectory
+            let file = "/goldenSample.txt"
+            contentA <- getUserContent user
+            uploadFile (uploadFileUri user) (path ++ file)
+            contentB <- getUserContent user
+            deleteFromUser user file
+            contentC <- getUserContent user
+            T.assertEqual "content before and after should be the same" contentA contentC
             
 uploadAndThenDownload :: IO ()
 uploadAndThenDownload = do
@@ -139,13 +141,9 @@ uploadFileUri u = fromJust $ serverUri $ "/user/upload/" ++ (urlEncode u)
 downloadFileFromUserUri u f = fromJust $ serverUri $ "/user/get/" ++ (urlEncode u) ++ "/" ++ (urlEncode f)
 userContentUri u = fromJust $ serverUri $ "/user/content/" ++ (urlEncode u)
 deleteFileFromUserUri u f = fromJust $ serverUri $ "/user/delete/" ++ (urlEncode u) ++ "/" ++ (urlEncode f)
+deleteContentFromUserUri u = fromJust $ serverUri $ "/user/clear/" ++ (urlEncode u)
 
-
--- for specific users:
 -- /user/sha1/$USER   => get sha1 checksum for $USER
--- list of user files
--- /user/clear/$USER => delete all files of $USER
--- /user/get/$USER/$FILE => start download of $FILE from $USER
 
 getUsers ::  IO (J.Result [String])
 getUsers = do 
@@ -160,7 +158,6 @@ getUserContent user = do
   let r = Request { rqURI = userContentUri user, rqMethod = GET, rqHeaders = [Header HdrContentLength "0"],rqBody=""}
   simpleHTTP r >>= getResponseBody >>= return . getX
     where getX s = let (J.Ok x) = J.decode s :: J.Result [MusicItem] in x
-
 
 createUser ::  String -> IO ()
 createUser user = do
@@ -180,6 +177,13 @@ deleteFromUser :: String -> String -> IO (J.Result [String])
 deleteFromUser user f = do
   putStrLn $ "delete " ++ f ++ " from user:" ++ user
   let r = Request { rqURI = deleteFileFromUserUri user f, rqMethod = GET, rqHeaders = [Header HdrContentLength "0"],rqBody=""}
+  rr <- simpleHTTP r >>= getResponseBody 
+  return $ J.decode rr
+
+deleteAllUserContent :: String -> IO (J.Result [String])
+deleteFromUser user = do
+  putStrLn $ "delete everything from user:" ++ user
+  let r = Request { rqURI = deleteContentFromUserUri user, rqMethod = GET, rqHeaders = [Header HdrContentLength "0"],rqBody=""}
   rr <- simpleHTTP r >>= getResponseBody 
   return $ J.decode rr
 
